@@ -1,0 +1,118 @@
+const db = require('./db');
+
+// USERS TABLE
+const usersTable = `
+CREATE TABLE IF NOT EXISTS users (
+    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL
+);
+`;
+
+// BOOKS TABLE
+const booksTable = `
+CREATE TABLE IF NOT EXISTS books (
+    book_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    author TEXT NOT NULL,
+    isbn TEXT UNIQUE NOT NULL,
+    category TEXT NOT NULL,
+    quantity INTEGER NOT NULL,
+    available_qty INTEGER NOT NULL,
+    description TEXT
+);
+`;
+
+// BORROW TRANSACTIONS TABLE
+const borrowTable = `
+CREATE TABLE IF NOT EXISTS borrow_transactions (
+    transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id INTEGER NOT NULL,
+    book_id INTEGER NOT NULL,
+    issue_date TEXT NOT NULL,
+    due_date TEXT NOT NULL,
+    return_date TEXT,
+    status TEXT DEFAULT 'active',
+    FOREIGN KEY(member_id) REFERENCES users(user_id),
+    FOREIGN KEY(book_id) REFERENCES books(book_id)
+);
+`;
+
+// FINES TABLE
+const finesTable = `
+CREATE TABLE IF NOT EXISTS fines (
+    fine_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id INTEGER NOT NULL,
+    transaction_id INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    days_overdue INTEGER NOT NULL,
+    is_paid INTEGER DEFAULT 0,
+    created_at TEXT,
+    FOREIGN KEY(member_id) REFERENCES users(user_id),
+    FOREIGN KEY(transaction_id) REFERENCES borrow_transactions(transaction_id)
+);
+`;
+
+// PAYMENTS TABLE
+const paymentsTable = `
+CREATE TABLE IF NOT EXISTS payments (
+    payment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id INTEGER NOT NULL,
+    fine_id INTEGER,
+    amount REAL NOT NULL,
+    method TEXT,
+    type TEXT,
+    status TEXT,
+    reference_id TEXT,
+    timestamp TEXT,
+    FOREIGN KEY(member_id) REFERENCES users(user_id),
+    FOREIGN KEY(fine_id) REFERENCES fines(fine_id)
+);
+`;
+
+// RESERVATIONS TABLE
+const reservationsTable = `
+CREATE TABLE IF NOT EXISTS reservations (
+    reservation_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id INTEGER NOT NULL,
+    book_id INTEGER NOT NULL,
+    reserved_at TEXT,
+    expiry_date TEXT,
+    status TEXT DEFAULT 'pending',
+    FOREIGN KEY(member_id) REFERENCES users(user_id),
+    FOREIGN KEY(book_id) REFERENCES books(book_id)
+);
+`;
+
+// NOTIFICATIONS TABLE
+const notificationsTable = `
+CREATE TABLE IF NOT EXISTS notifications (
+    notification_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id INTEGER,
+    message TEXT,
+    type TEXT,
+    created_at TEXT
+);
+`;
+
+const queries = [
+    usersTable,
+    booksTable,
+    borrowTable,
+    finesTable,
+    paymentsTable,
+    reservationsTable,
+    notificationsTable
+];
+
+queries.forEach((query) => {
+    db.run(query, (err) => {
+        if (err) {
+            console.error(err.message);
+        }
+    });
+});
+
+console.log('Database tables created successfully.');

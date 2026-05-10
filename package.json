@@ -12,6 +12,8 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
-    "nodemailer": "^8.0.5"
+    "nodemailer": "^8.0.5",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^6.0.1"
   }
 }
