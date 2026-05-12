@@ -96,10 +96,8 @@ class Member extends User {
     const dueDate   = new Date();
     dueDate.setDate(dueDate.getDate() + loanDays);
 
-    // Return a transaction record ready to be saved
-    // TODO: persist via db.createBorrowTransaction(record) + db.decrementBookStock(book.bookID)
     const record = {
-      transactionID: null,       // assigned by DB on INSERT
+      transactionID: null,
       memberID     : this.userID,
       bookID       : book.bookID,
       issueDate,
@@ -121,7 +119,7 @@ class Member extends User {
     const returnDate  = new Date();
     const msPerDay    = 1000 * 60 * 60 * 24;
     const daysOverdue = Math.max(0, Math.floor((returnDate - new Date(transaction.dueDate)) / msPerDay));
-    const FINE_RATE   = 5.0; // ₱5 per day — adjust to library policy
+    const FINE_RATE   = 5.0; // ₱5 per day
     const fineAmount  = daysOverdue * FINE_RATE;
 
     if (fineAmount > 0) {
@@ -131,9 +129,6 @@ class Member extends User {
       console.log(`Book returned on time by ${this.username}.`);
     }
 
-    // TODO: db.updateTransaction({ transactionID, returnDate, status: 'returned' })
-    // TODO: db.incrementBookStock(transaction.bookID)
-    // TODO: if fineAmount > 0, db.createFine({ memberID, transactionID, amount, daysOverdue })
     return { fineAmount, daysOverdue, returnDate };
   }
 
@@ -141,7 +136,6 @@ class Member extends User {
    * Pays outstanding fines. Returns a Payment record ready to be processed.
    * @param {number} amount
    * @param {string} method - 'gcash' | 'paymaya' | 'paypal' | 'card'
-   * @returns {object} payment record
    */
   payFine(amount, method) {
     if (this.outstandingFines <= 0) throw new Error("No outstanding fines. Current balance: ₱0.00");
@@ -149,7 +143,6 @@ class Member extends User {
       throw new Error(`Invalid amount. Outstanding: ₱${this.outstandingFines.toFixed(2)}`);
     }
 
-    // TODO: pass this record to Payment.processPayment()
     return {
       paymentID  : null,
       memberID   : this.userID,
@@ -165,7 +158,6 @@ class Member extends User {
   /**
    * Creates a reservation record for a book.
    * @param {object} book - { bookID, title }
-   * @returns {object} reservation record
    */
   reserveBook(book) {
     if (this.membershipStatus !== "active") {
@@ -176,7 +168,6 @@ class Member extends User {
     const expiryDate  = new Date();
     expiryDate.setDate(expiryDate.getDate() + 3); // 3-day hold
 
-    // TODO: db.createReservation(record)
     const record = {
       reservationID: null,
       memberID     : this.userID,
@@ -193,7 +184,6 @@ class Member extends User {
   /**
    * Fetches borrow history. Delegates to DB.
    * @param {Function} fetchHistory - async (memberID) => BorrowTransaction[]
-   * @returns {Promise<object[]>}
    */
   async viewHistory(fetchHistory) {
     return fetchHistory(this.userID);
