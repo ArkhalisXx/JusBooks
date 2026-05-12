@@ -27,7 +27,6 @@ class Report {
     this.content     = rows;
     this.generatedAt = new Date();
 
-    // TODO: db.insertReport({ reportType, generatedBy, generatedAt, rowCount: rows.length })
     console.log(`[Report] "${this.reportType}" — ${rows.length} row(s) fetched.`);
     return this;
   }
@@ -37,7 +36,7 @@ class Report {
   _buildQuery(opts = {}) {
     const { startDate, endDate, limit = 500 } = opts;
     const dateFilter = startDate && endDate
-      ? "AND created_at BETWEEN ? AND ?"
+      ? "AND bt.issue_date BETWEEN ? AND ?"
       : "";
     const dateValues = startDate && endDate ? [startDate, endDate] : [];
 
@@ -56,8 +55,8 @@ class Report {
               bt.due_date,
               bt.status
             FROM borrow_transactions bt
-            JOIN members m ON m.user_id = bt.member_id
-            JOIN books   b ON b.book_id  = bt.book_id
+            JOIN users m ON m.user_id = bt.member_id
+            JOIN books b ON b.book_id  = bt.book_id
             WHERE bt.status IN ('active', 'overdue')
             ${dateFilter}
             ORDER BY bt.issue_date DESC
@@ -71,17 +70,17 @@ class Report {
           sql: `
             SELECT
               bt.transaction_id,
-              m.username     AS member_name,
-              m.email        AS member_email,
-              b.title        AS book_title,
+              m.username    AS member_name,
+              m.email       AS member_email,
+              b.title       AS book_title,
               bt.due_date,
-              DATEDIFF(NOW(), bt.due_date)          AS days_overdue,
-              DATEDIFF(NOW(), bt.due_date) * 5.00   AS projected_fine
+              CAST((julianday('now') - julianday(bt.due_date)) AS INTEGER) AS days_overdue,
+              ROUND(CAST((julianday('now') - julianday(bt.due_date)) AS REAL) * 5.00, 2) AS projected_fine
             FROM borrow_transactions bt
-            JOIN members m ON m.user_id = bt.member_id
-            JOIN books   b ON b.book_id  = bt.book_id
+            JOIN users m ON m.user_id = bt.member_id
+            JOIN books b ON b.book_id  = bt.book_id
             WHERE bt.status = 'overdue'
-              OR (bt.status = 'active' AND bt.due_date < NOW())
+               OR (bt.status = 'active' AND bt.due_date < datetime('now'))
             ORDER BY days_overdue DESC
             LIMIT ?
           `,
@@ -112,8 +111,8 @@ class Report {
           sql: `
             SELECT
               p.payment_id,
-              m.username   AS member_name,
-              m.email      AS member_email,
+              m.username    AS member_name,
+              m.email       AS member_email,
               p.amount,
               p.method,
               p.type,
@@ -121,13 +120,12 @@ class Report {
               p.reference_id,
               p.timestamp
             FROM payments p
-            JOIN members m ON m.user_id = p.member_id
+            JOIN users m ON m.user_id = p.member_id
             WHERE p.status = 'confirmed'
-            ${dateFilter}
             ORDER BY p.timestamp DESC
             LIMIT ?
           `,
-          values: [...dateValues, limit],
+          values: [limit],
         };
 
       default:

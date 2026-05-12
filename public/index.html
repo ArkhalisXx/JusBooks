@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JusBooks — Library Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ══════════════════════════════════════════════
+     DESIGN TOKENS — navy/ivory/copper library theme
+  ══════════════════════════════════════════════ */
+  :root {
+    --bg:          #f5f0e8;
+    --surface:     #fffdf7;
+    --border:      #ddd0b0;
+    --border-focus:#c9a96e;
+    --text:        #1a2744;
+    --text-soft:   #3a3020;
+    --text-muted:  #7a6a52;
+    --blue:        #c9a96e;
+    --blue-dark:   #b8924f;
+    --blue-pale:   #fff8ee;
+    --red:         #8b2020;
+    --red-pale:    #faeaea;
+    --green:       #2d6a2d;
+    --green-pale:  #e8f4e8;
+    --amber:       #b45309;
+    --amber-pale:  #fff3e0;
+    --shadow-sm:   0 1px 4px rgba(26,39,68,0.08);
+    --shadow-md:   0 2px 12px rgba(26,39,68,0.10);
+    --shadow-lg:   0 4px 24px rgba(26,39,68,0.13);
+    --radius:      6px;
+    --radius-md:   8px;
+    --navy:        #1a2744;
+    --navy-mid:    #243460;
+    --navy-light:  #2d3f6e;
+    --copper:      #c9a96e;
+    --copper-dark: #b8924f;
+    --ivory:       #f5f0e8;
+    --parchment:   #fffdf7;
+  }
+
+  /* ── Reset ── */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  /* ══════════════════════════════════════════════
+     AUTH SCREEN
+  ══════════════════════════════════════════════ */
+  .auth-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+  }
+  .auth-box {
+    background: var(--parchment);
+    border-radius: var(--radius-md);
+    padding: 32px 28px 28px;
+    width: 300px;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border);
+  }
+  .auth-logo { text-align: center; margin-bottom: 22px; }
+  .auth-logo h1 {
+    font-size: 22px; font-weight: 700;
+    color: var(--navy); letter-spacing: -0.3px;
+  }
+  .auth-logo h1 span { color: var(--copper); }
+  .role-tabs { display: none; }
+  #registerUsernameGroup { display: none; }
+  .auth-toggle {
+    text-align: center; font-size: 13px;
+    color: var(--text-muted); margin-top: 14px;
+  }
+  .auth-toggle a {
+    color: var(--copper); text-decoration: none;
+    font-weight: 500; cursor: pointer;
+  }
+  .auth-toggle a:hover { text-decoration: underline; }
+
+  /* ══════════════════════════════════════════════
+     FORMS — shared across auth + modals + pages
+  ══════════════════════════════════════════════ */
+  .form-group { margin-bottom: 14px; }
+  .form-group label {
+    display: block; font-size: 13px; font-weight: 400;
+    color: var(--text-soft); margin-bottom: 5px;
+  }
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    width: 100%; padding: 9px 11px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px; color: var(--text);
+    outline: none; transition: border-color 0.15s;
+  }
+  .form-group input::placeholder,
+  .form-group textarea::placeholder { color: #aaa; font-size: 13px; }
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 2px rgba(58,155,213,0.15);
+  }
+
+  /* ══════════════════════════════════════════════
+     BUTTONS
+  ══════════════════════════════════════════════ */
+  .btn-primary {
+    width: 100%; padding: 10px;
+    background: var(--navy); color: var(--copper);
+    border: 1px solid var(--copper); border-radius: var(--radius);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s;
+    margin-top: 6px;
+  }
+  .btn-primary:hover { background: var(--navy-mid); }
+
+  .btn-action {
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s;
+    border: 1px solid;
+  }
+  .btn-action.primary   { background: var(--navy);    color: var(--copper);      border-color: var(--navy);    }
+  .btn-action.primary:hover   { background: var(--navy-mid); border-color: var(--navy-mid); }
+  .btn-action.secondary { background: var(--surface); color: var(--text);        border-color: var(--border);  }
+  .btn-action.secondary:hover { background: var(--bg); border-color: #bbb; }
+  .btn-action.danger    { background: var(--surface); color: var(--red);         border-color: #e0b0b0;        }
+  .btn-action.danger:hover    { background: var(--red-pale); }
+  .btn-action.gold      { background: var(--copper);  color: var(--navy);        border-color: var(--copper);  }
+  .btn-action.gold:hover      { background: var(--copper-dark); border-color: var(--copper-dark); }
+  .btn-sm { padding: 5px 11px !important; font-size: 12px !important; border-radius: 5px !important; }
+
+  /* ══════════════════════════════════════════════
+     APP SHELL
+  ══════════════════════════════════════════════ */
+  .app { display: none; min-height: 100vh; }
+  .app.visible { display: flex; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 220px; flex-shrink: 0;
+    background: var(--navy);
+    border-right: none;
+    display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .sidebar-header {
+    padding: 20px 16px 14px;
+    border-bottom: 1px solid var(--navy-light);
+  }
+  .sidebar-logo {
+    font-size: 20px; font-weight: 700;
+    color: var(--copper); letter-spacing: -0.3px;
+  }
+  .sidebar-logo span { color: #8da4c8; }
+  .sidebar-user { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
+  .user-avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--copper); color: var(--navy);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; flex-shrink: 0;
+  }
+  .user-info p    { font-size: 13px; font-weight: 500; color: #e8dfc8; }
+  .user-info span { font-size: 11px; color: #6a80a8; }
+
+  .sidebar-nav { padding: 10px 8px; flex: 1; overflow-y: auto; }
+  .nav-section-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.8px; color: #6a80a8;
+    padding: 12px 10px 4px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 10px; border-radius: var(--radius);
+    cursor: pointer; transition: background 0.12s;
+    color: #8da4c8; font-size: 13px; font-weight: 400;
+    margin-bottom: 1px; border: none; background: transparent;
+    width: 100%; text-align: left; font-family: 'DM Sans', sans-serif;
+  }
+  .nav-item:hover  { background: var(--navy-mid); color: #e8dfc8; }
+  .nav-item.active { background: var(--navy-mid); color: var(--copper); font-weight: 600; }
+  .nav-icon { width: 16px; text-align: center; font-size: 14px; flex-shrink: 0; }
+  .nav-badge {
+    margin-left: auto; background: var(--red); color: #fff;
+    font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px;
+  }
+  .nav-item.active .nav-badge { background: var(--copper); color: var(--navy); }
+
+  .sidebar-footer { padding: 10px 8px; border-top: 1px solid var(--navy-light); }
+  .logout-btn {
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 10px; border-radius: var(--radius);
+    cursor: pointer; color: #6a80a8; font-size: 13px;
+    transition: all 0.12s; border: none; background: transparent;
+    width: 100%; font-family: 'DM Sans', sans-serif;
+  }
+  .logout-btn:hover { background: var(--navy-mid); color: var(--red-pale); }
+
+  /* ── Main Content ── */
+  .main-content { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+  .page-header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 16px 28px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 10;
+  }
+  .page-title h2 { font-size: 18px; font-weight: 600; color: var(--navy); }
+  .page-title p  { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+  .page-body { padding: 24px 28px; flex: 1; }
+
+  /* ══════════════════════════════════════════════
+     STATS CARDS
+  ══════════════════════════════════════════════ */
+  .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: 18px;
+    position: relative; overflow: hidden; transition: box-shadow 0.15s;
+  }
+  .stat-card:hover { box-shadow: var(--shadow-md); }
+  .stat-card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+  }
+  .stat-card.gold::before    { background: var(--copper); }
+  .stat-card.crimson::before { background: var(--red); }
+  .stat-card.sage::before    { background: var(--green); }
+  .stat-card.slate::before   { background: var(--navy); }
+  .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); margin-bottom: 6px; }
+  .stat-value { font-size: 32px; font-weight: 700; color: var(--text); line-height: 1; }
+  .stat-sub   { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+  .stat-icon  { position: absolute; top: 14px; right: 14px; font-size: 24px; opacity: 0.1; }
+
+  /* ══════════════════════════════════════════════
+     CARDS
+  ══════════════════════════════════════════════ */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; margin-bottom: 18px; }
+  .card-header {
+    padding: 13px 18px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-title { font-size: 14px; font-weight: 600; color: var(--navy); }
+  .card-body  { padding: 18px; }
+
+  /* ══════════════════════════════════════════════
+     SEARCH + FILTERS
+  ══════════════════════════════════════════════ */
+  .search-bar { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+  .search-input-wrap { flex: 1; position: relative; }
+  .search-input-wrap input {
+    width: 100%; padding: 9px 12px 9px 34px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text);
+    background: var(--surface); outline: none; transition: border-color 0.15s;
+  }
+  .search-input-wrap input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 2px rgba(58,155,213,0.12); }
+  .search-icon {
+    position: absolute; left: 10px; top: 50%;
+    transform: translateY(-50%); color: var(--text-muted);
+    font-size: 14px; pointer-events: none;
+  }
+  .filter-select {
+    padding: 9px 12px; border: 1px solid var(--border);
+    border-radius: var(--radius); font-family: 'DM Sans', sans-serif;
+    font-size: 13px; color: var(--text); background: var(--surface);
+    outline: none; cursor: pointer;
+  }
+  .filter-select:focus { border-color: var(--border-focus); }
+
+  /* ══════════════════════════════════════════════
+     TABLE
+  ══════════════════════════════════════════════ */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    text-align: left; padding: 9px 14px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.6px; color: var(--text-muted);
+    background: var(--bg); border-bottom: 1px solid var(--border);
+  }
+  .data-table td {
+    padding: 11px 14px; font-size: 13px;
+    border-bottom: 1px solid #f0f0f0;
+    color: var(--text); vertical-align: middle;
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: #fafafa; }
+  .book-title  { font-weight: 500; }
+  .book-author { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .isbn-mono   { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-muted); }
+
+  /* ══════════════════════════════════════════════
+     BADGES
+  ══════════════════════════════════════════════ */
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 9px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.2px;
+  }
+  .badge.available   { background: var(--green-pale); color: var(--green); }
+  .badge.unavailable { background: var(--red-pale);   color: var(--red);   }
+  .badge.active      { background: var(--green-pale); color: var(--green); }
+  .badge.overdue     { background: var(--red-pale);   color: var(--red);   }
+  .badge.pending     { background: var(--amber-pale); color: var(--amber); }
+  .badge.returned    { background: #f0f0f0;           color: #777;         }
+  .badge.suspended   { background: var(--red-pale);   color: var(--red);   }
+  .badge.paid        { background: var(--green-pale); color: var(--green); }
+  .badge.unpaid      { background: var(--amber-pale); color: var(--amber); }
+
+  /* ══════════════════════════════════════════════
+     BOOK GRID
+  ══════════════════════════════════════════════ */
+  .book-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap: 14px; margin-bottom: 18px; }
+  .book-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-md); overflow: hidden;
+    transition: box-shadow 0.15s, transform 0.15s; cursor: pointer;
+  }
+  .book-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+  .book-spine {
+    height: 130px; display: flex; align-items: flex-end;
+    padding: 10px; position: relative; overflow: hidden;
+  }
+  .book-spine::after {
+    content: ''; position: absolute; left: 0; top: 0;
+    width: 5px; height: 100%; background: rgba(0,0,0,0.12);
+  }
+  .book-card-body   { padding: 10px; }
+  .book-card-title  { font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.3; margin-bottom: 2px; }
+  .book-card-author { font-size: 11px; color: var(--text-muted); margin-bottom: 7px; }
+  .book-card-footer { display: flex; align-items: center; justify-content: space-between; }
+  .book-qty .qty-num { font-weight: 700; color: var(--text); }
+  .book-qty { font-size: 11px; color: var(--text-muted); }
+
+  /* ══════════════════════════════════════════════
+     ACTIVITY FEED
+  ══════════════════════════════════════════════ */
+  .activity-list { list-style: none; }
+  .activity-item {
+    display: flex; gap: 10px; padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0; align-items: flex-start;
+  }
+  .activity-item:last-child { border-bottom: none; }
+  .activity-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+  .activity-dot.borrow  { background: var(--green); }
+  .activity-dot.return  { background: #555; }
+  .activity-dot.fine    { background: var(--red); }
+  .activity-dot.reserve { background: var(--blue); }
+  .activity-dot.overdue { background: var(--red); }
+  .activity-text { font-size: 13px; color: var(--text-soft); line-height: 1.45; }
+  .activity-text strong { color: var(--text); font-weight: 600; }
+  .activity-time { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+  /* ══════════════════════════════════════════════
+     FINE DISPLAY
+  ══════════════════════════════════════════════ */
+  .fine-display {
+    background: var(--red-pale); border: 1px solid #f5c6c2;
+    border-radius: var(--radius-md); padding: 16px;
+    text-align: center; margin: 14px 0;
+  }
+  .fine-amount { font-size: 36px; font-weight: 700; color: var(--red); }
+  .fine-detail { font-size: 12px; color: #b91c1c; margin-top: 3px; }
+
+  /* ══════════════════════════════════════════════
+     MODAL
+  ══════════════════════════════════════════════ */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35); z-index: 100;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border-radius: var(--radius-md);
+    width: 100%; max-width: 500px; max-height: 88vh;
+    overflow-y: auto; box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border);
+  }
+  .modal-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--surface); z-index: 1;
+  }
+  .modal-title { font-size: 15px; font-weight: 600; color: var(--text); }
+  .modal-close {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: none; background: var(--bg);
+    color: var(--text-muted); font-size: 17px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.12s;
+  }
+  .modal-close:hover { background: var(--border); }
+  .modal-body   { padding: 20px; }
+  .modal-footer {
+    padding: 14px 20px; border-top: 1px solid var(--border);
+    display: flex; gap: 8px; justify-content: flex-end;
+  }
+
+  /* ══════════════════════════════════════════════
+     EMPTY STATE
+  ══════════════════════════════════════════════ */
+  .empty-state { text-align: center; padding: 56px 20px; color: var(--text-muted); }
+  .empty-state .empty-icon { font-size: 44px; margin-bottom: 10px; opacity: 0.35; }
+  .empty-state p { font-size: 14px; }
+
+  /* ══════════════════════════════════════════════
+     MEMBER BORROW BAR
+  ══════════════════════════════════════════════ */
+  .member-borrow-bar {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: 14px 18px;
+    display: flex; align-items: center; gap: 14px; margin-bottom: 18px;
+  }
+  .borrow-progress { flex: 1; }
+  .borrow-progress-bar { height: 7px; background: var(--bg); border-radius: 4px; margin-top: 5px; overflow: hidden; }
+  .borrow-progress-fill { height: 100%; background: var(--blue); border-radius: 4px; transition: width 0.3s; }
+  .progress-label { font-size: 13px; font-weight: 500; color: var(--text); }
+  .progress-sub   { font-size: 11px; color: var(--text-muted); }
+
+  /* ══════════════════════════════════════════════
+     PAYMENT METHODS
+  ══════════════════════════════════════════════ */
+  .payment-methods { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-bottom: 14px; }
+  .payment-method {
+    padding: 11px; border: 1px solid var(--border);
+    border-radius: var(--radius-md); text-align: center;
+    cursor: pointer; transition: all 0.12s;
+    font-size: 13px; font-weight: 500; background: var(--surface);
+  }
+  .payment-method:hover { border-color: var(--border-focus); }
+  .payment-method.selected { border-color: var(--copper); background: var(--blue-pale); color: var(--navy); }
+  .payment-method .pm-icon { font-size: 22px; margin-bottom: 3px; }
+  .payment-method .pm-name { font-size: 11px; color: var(--text-muted); }
+
+  /* ══════════════════════════════════════════════
+     TOAST
+  ══════════════════════════════════════════════ */
+  .toast {
+    position: fixed; bottom: 22px; right: 22px;
+    background: #333; color: #fff;
+    padding: 12px 18px; border-radius: var(--radius-md);
+    font-size: 13px; font-weight: 500; z-index: 999;
+    transform: translateY(80px); opacity: 0;
+    transition: all 0.28s cubic-bezier(0.34,1.56,0.64,1);
+    max-width: 300px; box-shadow: var(--shadow-lg);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success .toast-dot { color: #4ade80; }
+  .toast.error   .toast-dot { color: #f87171; }
+  .toast.info    .toast-dot { color: #60a5fa; }
+
+  /* ══════════════════════════════════════════════
+     REPORT BAR
+  ══════════════════════════════════════════════ */
+  .report-bar-wrap  { margin: 7px 0; }
+  .report-bar-label { font-size: 13px; color: var(--text); margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .report-bar       { height: 20px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+  .report-bar-fill  {
+    height: 100%; border-radius: 4px;
+    transition: width 0.6s cubic-bezier(0.16,1,0.3,1);
+    display: flex; align-items: center; padding-left: 8px;
+    font-size: 11px; font-weight: 600; color: #fff;
+  }
+
+  /* ══════════════════════════════════════════════
+     LAYOUT HELPERS
+  ══════════════════════════════════════════════ */
+  .two-col   { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .gold-note {
+    background: var(--blue-pale); border: 1px solid rgba(58,155,213,0.25);
+    border-radius: var(--radius); padding: 11px; font-size: 13px; color: var(--text-soft);
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════ AUTH SCREEN ═══ -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <h1>Jus<span>Books</span></h1>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">Library Management System</p>
+    </div>
+
+    <!-- Register-only field -->
+    <div class="form-group" id="registerUsernameGroup">
+      <label>Username</label>
+      <input type="text" id="registerUsername" placeholder="Choose username">
+    </div>
+
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="Enter email" value="maria@example.com">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="Enter password" value="password123">
+    </div>
+
+    <button class="btn-primary" id="authSubmitBtn" onclick="doLogin()">Login</button>
+
+    <div class="auth-toggle" id="authToggle">
+      Don't have an account? <a onclick="switchToRegister()">Register</a>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ APP SHELL ═══ -->
+<div class="app" id="appShell">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">Jus<span>Books</span></div>
+      <div class="sidebar-user">
+        <div class="user-avatar" id="sidebarAvatar">MR</div>
+        <div class="user-info">
+          <p id="sidebarName">Maria R.</p>
+          <span id="sidebarRole">Member</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-nav" id="sidebarNav"></div>
+
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="doLogout()">
+        <span>↩</span> Sign Out
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main-content" id="mainContent">
+    <!-- Injected by JS -->
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ MODALS ═══ -->
+
+<!-- Add/Edit Book Modal -->
+<div class="modal-overlay" id="bookModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="bookModalTitle">Add New Book</span>
+      <button class="modal-close" onclick="closeModal('bookModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="input-row">
+        <div class="form-group">
+          <label>Title *</label>
+          <input type="text" id="bkTitle" placeholder="Book title">
+        </div>
+        <div class="form-group">
+          <label>Author *</label>
+          <input type="text" id="bkAuthor" placeholder="Author name">
+        </div>
+      </div>
+      <div class="input-row">
+        <div class="form-group">
+          <label>ISBN *</label>
+          <input type="text" id="bkISBN" placeholder="978-XXXXXXXXXX">
+        </div>
+        <div class="form-group">
+          <label>Category *</label>
+          <select id="bkCategory">
+            <option value="">Select category</option>
+            <option>Fiction</option>
+            <option>Non-Fiction</option>
+            <option>Science</option>
+            <option>History</option>
+            <option>Technology</option>
+            <option>Philosophy</option>
+            <option>Biography</option>
+            <option>Children</option>
+            <option>Reference</option>
+          </select>
+        </div>
+      </div>
+      <div class="input-row">
+        <div class="form-group">
+          <label>Total Quantity *</label>
+          <input type="number" id="bkQty" placeholder="1" min="1">
+        </div>
+        <div class="form-group">
+          <label>Available Qty</label>
+          <input type="number" id="bkAvailQty" placeholder="Auto-filled">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea id="bkDesc" placeholder="Brief description..." rows="3" style="resize:vertical;"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-action secondary" onclick="closeModal('bookModal')">Cancel</button>
+      <button class="btn-action primary" onclick="saveBook()">Save Book</button>
+    </div>
+  </div>
+</div>
+
+<!-- Borrow Modal -->
+<div class="modal-overlay" id="borrowModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Borrow Book</span>
+      <button class="modal-close" onclick="closeModal('borrowModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="borrowBookInfo" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:14px;">
+        <p style="font-weight:600;font-size:14px;" id="borrowBookTitle">–</p>
+        <p style="font-size:13px;color:var(--text-muted);" id="borrowBookAuthor">–</p>
+      </div>
+      <div class="form-group">
+        <label>Loan Period</label>
+        <select id="borrowDays">
+          <option value="7">7 days</option>
+          <option value="14" selected>14 days (default)</option>
+          <option value="21">21 days</option>
+          <option value="30">30 days</option>
+        </select>
+      </div>
+      <div style="background:var(--blue-pale);border:1px solid rgba(58,155,213,0.25);border-radius:var(--radius);padding:11px;font-size:13px;color:var(--text-soft);">
+        <strong>Late fine policy:</strong> ₱5.00 per day overdue. Please return on time to avoid fines.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-action secondary" onclick="closeModal('borrowModal')">Cancel</button>
+      <button class="btn-action gold" onclick="confirmBorrow()">Confirm Borrow</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pay Fine Modal -->
+<div class="modal-overlay" id="payModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Pay Outstanding Fine</span>
+      <button class="modal-close" onclick="closeModal('payModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fine-display">
+        <div class="fine-amount" id="payFineAmt">₱0.00</div>
+        <div class="fine-detail" id="payFineDetail">Outstanding balance</div>
+      </div>
+      <p style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text-soft);">Select Payment Method</p>
+      <div class="payment-methods">
+        <div class="payment-method" onclick="selectPayMethod('gcash',this)">
+          <div class="pm-icon">💙</div>
+          <div style="font-size:13px;font-weight:600;">GCash</div>
+          <div class="pm-name">via PayMongo</div>
+        </div>
+        <div class="payment-method" onclick="selectPayMethod('paymaya',this)">
+          <div class="pm-icon">💚</div>
+          <div style="font-size:13px;font-weight:600;">Maya</div>
+          <div class="pm-name">PayMaya</div>
+        </div>
+        <div class="payment-method" onclick="selectPayMethod('paypal',this)">
+          <div class="pm-icon">🅿️</div>
+          <div style="font-size:13px;font-weight:600;">PayPal</div>
+          <div class="pm-name">International</div>
+        </div>
+        <div class="payment-method" onclick="selectPayMethod('card',this)">
+          <div class="pm-icon">💳</div>
+          <div style="font-size:13px;font-weight:600;">Card</div>
+          <div class="pm-name">Visa / Mastercard</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-action secondary" onclick="closeModal('payModal')">Cancel</button>
+      <button class="btn-action primary" onclick="processPay()">Pay Now</button>
+    </div>
+  </div>
+</div>
+
+<!-- Member Detail Modal (Librarian) -->
+<div class="modal-overlay" id="memberModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="memberModalTitle">Member Details</span>
+      <button class="modal-close" onclick="closeModal('memberModal')">×</button>
+    </div>
+    <div class="modal-body" id="memberModalBody">
+    </div>
+    <div class="modal-footer" id="memberModalFooter">
+      <button class="btn-action secondary" onclick="closeModal('memberModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <span class="toast-dot">●</span>
+  <span id="toastMsg">Done!</span>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════
+const API = 'http://localhost:3000/api';
+
+// ════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════
+let currentUser = null;
+let currentRole = 'member';
+let currentPage = '';
+let selectedPayMethod = '';
+let borrowTarget = null;
+let editBookId = null;
+
+const BOOK_COLORS = [
+  '#6b4c3b','#2d5a3d','#1a3a5c','#5c1a1a','#3d3a1a','#1a1a5c','#5c3a1a','#1a5c3a'
+];
+
+const CATEGORIES = [
+  'Fiction','Non-Fiction','Science','History',
+  'Technology','Philosophy','Biography','Children','Reference',
+];
+
+// ════════════════════════════════════════════════
+// API HELPERS
+// ════════════════════════════════════════════════
+function getToken() { return localStorage.getItem('jb_token'); }
+function setToken(t) { localStorage.setItem('jb_token', t); }
+function clearToken() { localStorage.removeItem('jb_token'); }
+
+async function api(method, path, body) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  const token = getToken();
+  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+  if (body)  opts.body = JSON.stringify(body);
+
+  const res  = await fetch(API + path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+const GET    = (path)        => api('GET',    path);
+const POST   = (path, body)  => api('POST',   path, body);
+const PUT    = (path, body)  => api('PUT',    path, body);
+const DELETE = (path)        => api('DELETE', path);
+
+// ════════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════════
+let authMode = 'login';
+
+function switchToRegister() {
+  authMode = 'register';
+  document.getElementById('registerUsernameGroup').style.display = 'block';
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('authSubmitBtn').textContent = 'Register';
+  document.getElementById('authSubmitBtn').onclick = doRegister;
+  document.getElementById('authToggle').innerHTML = 'Already have an account? <a onclick="switchToLogin()">Login</a>';
+}
+
+function switchToLogin() {
+  authMode = 'login';
+  document.getElementById('registerUsernameGroup').style.display = 'none';
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('authSubmitBtn').textContent = 'Login';
+  document.getElementById('authSubmitBtn').onclick = doLogin;
+  document.getElementById('authToggle').innerHTML = 'Don\'t have an account? <a onclick="switchToRegister()">Register</a>';
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPassword').value;
+  if (!email || !pass) { showToast('Please enter email and password', 'error'); return; }
+
+  try {
+    const { token, user } = await POST('/auth/login', { email, password: pass });
+    setToken(token);
+    currentUser = user;
+    currentRole = user.role;
+    enterApp();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function doRegister() {
+  const username = document.getElementById('registerUsername').value.trim();
+  const email    = document.getElementById('loginEmail').value.trim();
+  const pass     = document.getElementById('loginPassword').value;
+  if (!username || !email || !pass) { showToast('Please fill in all fields', 'error'); return; }
+  if (pass.length < 6) { showToast('Password must be at least 6 characters', 'error'); return; }
+
+  try {
+    await POST('/auth/register', { username, email, password: pass });
+    showToast('Account created! Please log in.', 'success');
+    switchToLogin();
+    document.getElementById('loginEmail').value = email;
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+function enterApp() {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('appShell').style.display   = 'flex';
+  document.getElementById('sidebarAvatar').textContent =
+    currentUser.username.split(' ').map(w=>w[0]).join('').substring(0,2);
+  document.getElementById('sidebarName').textContent = currentUser.username;
+  document.getElementById('sidebarRole').textContent = currentRole === 'librarian' ? 'Librarian' : 'Member';
+  buildNav();
+  navigateTo(currentRole === 'librarian' ? 'dashboard' : 'catalog');
+}
+
+function doLogout() {
+  clearToken();
+  currentUser = null;
+  switchToLogin();
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('appShell').style.display   = 'none';
+}
+
+// ════════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════════
+const LIBRARIAN_NAV = [
+  { id:'dashboard',     icon:'◈',  label:'Dashboard',     section:'Overview'    },
+  { id:'books',         icon:'📖', label:'Books',         section:'Management'  },
+  { id:'members',       icon:'👥', label:'Members'                              },
+  { id:'transactions',  icon:'↔',  label:'Transactions'                         },
+  { id:'fines',         icon:'⚠',  label:'Fines'                                },
+  { id:'reports',       icon:'📊', label:'Reports',       section:'Tools'       },
+  { id:'notifications', icon:'🔔', label:'Notifications'                        },
+];
+
+const MEMBER_NAV = [
+  { id:'catalog',    icon:'📖', label:'Browse Catalog', section:'Library' },
+  { id:'myborrows',  icon:'↔',  label:'My Borrows'                        },
+  { id:'myreserves', icon:'🔖', label:'Reservations'                      },
+  { id:'myfines',    icon:'⚠',  label:'My Fines',       section:'Account' },
+  { id:'history',    icon:'⏱',  label:'History'                           },
+];
+
+function buildNav() {
+  const nav = currentRole === 'librarian' ? LIBRARIAN_NAV : MEMBER_NAV;
+  let html = '', lastSection = null;
+  nav.forEach(item => {
+    if (item.section && item.section !== lastSection) {
+      html += `<div class="nav-section-label">${item.section}</div>`;
+      lastSection = item.section;
+    }
+    html += `<button class="nav-item" id="nav-${item.id}" onclick="navigateTo('${item.id}')">
+      <span class="nav-icon">${item.icon}</span>
+      <span>${item.label}</span>
+    </button>`;
+  });
+  document.getElementById('sidebarNav').innerHTML = html;
+}
+
+function navigateTo(page) {
+  currentPage = page;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const btn = document.getElementById('nav-' + page);
+  if (btn) btn.classList.add('active');
+
+  const pages = {
+    dashboard:     renderLibrarianDashboard,
+    books:         renderBooks,
+    members:       renderMembers,
+    transactions:  renderTransactions,
+    fines:         renderFines,
+    reports:       renderReports,
+    notifications: renderNotifications,
+    catalog:       renderCatalog,
+    myborrows:     renderMyBorrows,
+    myreserves:    renderMyReserves,
+    myfines:       renderMyFines,
+    history:       renderHistory,
+  };
+  if (pages[page]) pages[page]();
+}
+
+// ════════════════════════════════════════════════
+// LIBRARIAN PAGES
+// ════════════════════════════════════════════════
+async function renderLibrarianDashboard() {
+  setContent('<div style="padding:40px;text-align:center;color:var(--text-muted);">Loading dashboard…</div>');
+  try {
+    const { stats, activity } = await GET('/dashboard');
+    setContent(`
+      <div class="page-header">
+        <div class="page-title"><h2>Dashboard</h2><p>Library overview — ${new Date().toLocaleDateString('en-PH',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p></div>
+      </div>
+      <div class="page-body">
+        <div class="stats-grid">
+          <div class="stat-card gold">
+            <div class="stat-icon">📚</div>
+            <div class="stat-label">Total Books</div>
+            <div class="stat-value">${stats.totalBooks}</div>
+          </div>
+          <div class="stat-card crimson">
+            <div class="stat-icon">⚠</div>
+            <div class="stat-label">Overdue</div>
+            <div class="stat-value">${stats.overdueBooks}</div>
+            <div class="stat-sub">${stats.activeBorrows} active borrows</div>
+          </div>
+          <div class="stat-card sage">
+            <div class="stat-icon">👥</div>
+            <div class="stat-label">Active Members</div>
+            <div class="stat-value">${stats.activeMembers}</div>
+          </div>
+          <div class="stat-card slate">
+            <div class="stat-icon">₱</div>
+            <div class="stat-label">Unpaid Fines</div>
+            <div class="stat-value">₱${Number(stats.unpaidFines).toFixed(0)}</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Recent Activity</span></div>
+          <div class="card-body" style="padding:8px 16px;">
+            <ul class="activity-list">
+              ${activity.length ? activity.map(a=>`
+                <li class="activity-item">
+                  <div class="activity-dot ${a.type}"></div>
+                  <div>
+                    <div class="activity-text"><strong>${a.actor}</strong> — ${a.type} "${a.target}"</div>
+                    <div class="activity-time">${new Date(a.ts).toLocaleString()}</div>
+                  </div>
+                </li>`).join('') : '<li style="color:var(--text-muted);padding:8px 0;">No recent activity.</li>'}
+            </ul>
+          </div>
+        </div>
+      </div>
+    `);
+  } catch(e) { showToast('Failed to load dashboard: ' + e.message, 'error'); }
+}
+
+async function renderBooks() {
+  setContent('<div style="padding:40px;text-align:center;color:var(--text-muted);">Loading books…</div>');
+  try {
+    const books = await GET('/books');
+    setContent(`
+      <div class="page-header">
+        <div class="page-title"><h2>Book Catalog</h2><p>Manage the library collection</p></div>
+        <div class="header-actions">
+          <button class="btn-action primary" onclick="openAddBook()">+ Add Book</button>
+        </div>
+      </div>
+      <div class="page-body">
+        <div class="search-bar">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" placeholder="Search by title, author, ISBN…" oninput="filterBooksLive(this.value)">
+          </div>
+          <select class="filter-select" id="catFilter" onchange="filterBooksLive(document.querySelector('.search-input-wrap input').value)">
+            <option value="">All Categories</option>
+            ${[...new Set(books.map(b=>b.category))].map(c=>`<option>${c}</option>`).join('')}
+          </select>
+        </div>
+        <div class="card">
+          <table class="data-table" id="booksTable">
+            <thead><tr><th>Title / Author</th><th>ISBN</th><th>Category</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="booksBody">${renderBooksRows(books)}</tbody>
+          </table>
+        </div>
+      </div>
+    `);
+    window._allBooks = books;
+  } catch(e) { showToast('Failed to load books: ' + e.message, 'error'); }
+}
+
+function renderBooksRows(books) {
+  if (!books.length) return '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No books found.</td></tr>';
+  return books.map(b=>`
+    <tr>
+      <td><div class="book-title">${b.title}</div><div class="book-author">${b.author}</div></td>
+      <td><span class="isbn-mono">${b.ISBN}</span></td>
+      <td>${b.category}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:13px;">${b.availableQty}/${b.quantity}</td>
+      <td><span class="badge ${b.availableQty>0?'available':'unavailable'}">${b.availableQty>0?'Available':'Checked Out'}</span></td>
+      <td>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-action secondary btn-sm" onclick="openEditBook(${b.bookID})">Edit</button>
+          <button class="btn-action danger btn-sm" onclick="deleteBook(${b.bookID})">Delete</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function filterBooksLive(kw) {
+  const cat = document.getElementById('catFilter')?.value || '';
+  const filtered = (window._allBooks||[]).filter(b=>
+    (!kw || b.title.toLowerCase().includes(kw.toLowerCase()) ||
+             b.author.toLowerCase().includes(kw.toLowerCase()) ||
+             b.ISBN.includes(kw)) &&
+    (!cat || b.category === cat)
+  );
+  const tbody = document.getElementById('booksBody');
+  if (tbody) tbody.innerHTML = renderBooksRows(filtered);
+}
+
+function openAddBook() {
+  editBookId = null;
+  document.getElementById('bookModalTitle').textContent = 'Add New Book';
+  ['bkTitle','bkAuthor','bkISBN','bkDesc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('bkCategory').value = '';
+  document.getElementById('bkQty').value = '';
+  document.getElementById('bkAvailQty').value = '';
+  openModal('bookModal');
+}
+
+function openEditBook(id) {
+  const b = (window._allBooks||[]).find(bk=>bk.bookID===id);
+  if (!b) return;
+  editBookId = id;
+  document.getElementById('bookModalTitle').textContent = 'Edit Book';
+  document.getElementById('bkTitle').value    = b.title;
+  document.getElementById('bkAuthor').value   = b.author;
+  document.getElementById('bkISBN').value     = b.ISBN;
+  document.getElementById('bkCategory').value = b.category;
+  document.getElementById('bkQty').value      = b.quantity;
+  document.getElementById('bkAvailQty').value = b.availableQty;
+  document.getElementById('bkDesc').value     = b.description;
+  openModal('bookModal');
+}
+
+async function saveBook() {
+  const title    = document.getElementById('bkTitle').value.trim();
+  const author   = document.getElementById('bkAuthor').value.trim();
+  const ISBN     = document.getElementById('bkISBN').value.trim();
+  const category = document.getElementById('bkCategory').value;
+  const quantity = parseInt(document.getElementById('bkQty').value) || 0;
+  const description = document.getElementById('bkDesc').value.trim();
+
+  if (!title||!author||!ISBN||!category||!quantity) { showToast('Please fill all required fields','error'); return; }
+
+  try {
+    if (editBookId) {
+      await PUT(`/books/${editBookId}`, { title, author, ISBN, category, quantity, description });
+      showToast('Book updated successfully','success');
+    } else {
+      await POST('/books', { title, author, ISBN, category, quantity, description });
+      showToast('Book added to catalog','success');
+    }
+    closeModal('bookModal');
+    renderBooks();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deleteBook(id) {
+  if (!confirm('Delete this book?')) return;
+  try {
+    await DELETE(`/books/${id}`);
+    showToast('Book removed from catalog','info');
+    renderBooks();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function renderMembers() {
+  setContent('<div style="padding:40px;text-align:center;color:var(--text-muted);">Loading members…</div>');
+  try {
+    const members = await GET('/members');
+    window._allMembers = members;
+    setContent(`
+      <div class="page-header">
+        <div class="page-title"><h2>Members</h2><p>Manage library memberships</p></div>
+      </div>
+      <div class="page-body">
+        <div class="search-bar">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" placeholder="Search members…" oninput="filterMembersLive(this.value)">
+          </div>
+        </div>
+        <div class="card">
+          <table class="data-table">
+            <thead><tr><th>Member</th><th>Status</th><th>Outstanding Fine</th><th>Actions</th></tr></thead>
+            <tbody id="membersBody">${renderMembersRows(members)}</tbody>
+          </table>
+        </div>
+      </div>
+    `);
+  } catch(e) { showToast('Failed to load members: ' + e.message, 'error'); }
+}
+
+function renderMembersRows(members) {
+  if (!members.length) return '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px;">No members found.</td></tr>';
+  return members.map(m=>`
+    <tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="user-avatar" style="width:34px;height:34px;font-size:12px;">${m.username.split(' ').map(w=>w[0]).join('').substring(0,2)}</div>
+          <div>
+            <div style="font-weight:500;">${m.username}</div>
+            <div style="font-size:12px;color:var(--text-muted);">${m.email}</div>
+          </div>
+        </div>
+      </td>
+      <td><span class="badge ${m.membershipStatus}">${m.membershipStatus}</span></td>
+      <td style="font-weight:${m.outstandingFines>0?'600':'400'};color:${m.outstandingFines>0?'var(--red)':'var(--text-muted)'};">
+        ${m.outstandingFines>0 ? '₱'+Number(m.outstandingFines).toFixed(2) : '—'}
+      </td>
+      <td>
+        <div style="display:flex;gap:6px;">
+          ${m.membershipStatus==='active'
+            ? `<button class="btn-action danger btn-sm" onclick="setMemberStatus(${m.userID},'suspended')">Suspend</button>`
+            : `<button class="btn-action gold btn-sm" onclick="setMemberStatus(${m.userID},'active')">Activate</button>`}
+          <button class="btn-action danger btn-sm" onclick="deleteMember(${m.userID})">Delete</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function filterMembersLive(kw) {
+  const filtered = (window._allMembers||[]).filter(m=>
+    !kw || m.username.toLowerCase().includes(kw.toLowerCase()) || m.email.includes(kw)
+  );
+  const tbody = document.getElementById('membersBody');
+  if (tbody) tbody.innerHTML = renderMembersRows(filtered);
+}
+
+async function setMemberStatus(id, status) {
+  try {
+    await PUT(`/members/${id}/status`, { status });
+    showToast(`Member ${status === 'active' ? 'activated' : 'suspended'}`, 'success');
+    renderMembers();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deleteMember(id) {
+  if (!confirm('Delete this member?')) return;
+  try {
+    await DELETE(`/members/${id}`);
+    showToast('Member deleted','info');
+    renderMembers();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function renderTransactions() {
+  setContent('<div style="padding:40px;text-align:center;color:var(--text-muted);">Loading transactions…</div>');
+  try {
+    const txns = await GET('/transactions');
+    setContent(`
+      <div class="page-header">
+        <div class="page-title"><h2>Transactions</h2><p>All borrowing records</p></div>
+      </div>
+      <div class="page-body">
+        <div class="card">
+          <table class="data-table">
+            <thead><tr><th>#</th><th>Member</th><th>Book</th><th>Issue Date</th><th>Due Date</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+              ${txns.length ? txns.map(t=>`
+                <tr>
+                  <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text-muted);">#${t.transactionID}</td>
+                  <td>${t.memberName}</td>
+                  <td><div class="book-title">${t.bookTitle}</div></td>
+                  <td style="font-size:13px;">${t.issueDate?.slice(0,10)||''}</td>
+                  <td style="font-size:13px;">${t.dueDate?.slice(0,10)||''}</td>
+                  <td><span class="badge ${t.status}">${t.status}</span></td>
+                  <td>
+                    ${t.status!=='returned'
+                      ? `<button class="btn-action secondary btn-sm" onclick="markReturned(${t.transactionID})">Mark Returned</button>`
+                      : '—'}
+                  </td>
+                </tr>`).join('')
+              : '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">No transactions yet.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `);
+  } catch(e) { showToast('Failed to load transactions: ' + e.message, 'error'); }
+}
+
+async function markReturned(id) {
+  try {
+    const result = await POST(`/return/${id}`);
+    showToast(result.message, result.fine ? 'error' : 'success');
+    renderTransactions();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function renderFines() {
+  setContent('<div style="padding:40px;text-align:center;color:var(--text-muted);">Loading fines…</div>');
+  try {
+    const fines = await GET('/fines');
+    setContent(`
+      <div class="page-header">
+        <div class="page-title"><h2>Fines</h2><p>Overdue fines management</p></div>
+      </div>
+      <div class="page-body">
+        <div class="card">
+          <table class="data-table">
+            <thead><tr><th>Fine #</th><th>Member</th><th>Book</th><th>Days Overdue</th><th>Amount</th><th>Status</th></tr></thead>
+            <tbody>
+              ${fines.length ? fines.map(f=>`
+                <tr>
+                  <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text-muted);">#${f.fineID}</td>
+                  <td>${f.memberName}</td>
+                  <td>${f.bookTitle}</td>
+                  <td>${f.daysOverdue} days</td>
+                  <td style="font-weight:600;color:${f.isPaid?'var(--green)':'var(--red)'};">₱${Number(f.amount).toFixed(2)}</td>
+                  <td><span class="badge ${f.isPaid?'paid':'unpaid'}">${f.isPaid?'Paid':'Unpaid'}</span></td>
+                </tr>`).join('')
+              : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">No fines recorded.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `);
+  } catch(e) { showToast('Failed to load fines: ' + e.message, 'error'); }
+}
+
+async function renderReports() {
+  setContent(`
+    <div class="page-header">
+      <div class="page-title"><h2>Reports</h2><p>Generate and export library reports</p></div>
+    </div>
+    <div class="page-body">
+      <div class="two-col">
+        ${[
+          { type:'borrowed', label:'Currently Borrowed', icon:'📖', color:'var(--green)' },
+          { type:'overdue',  label:'Overdue Books',      icon:'⚠',  color:'var(--red)'   },
+          { type:'frequent', label:'Most Borrowed',      icon:'📊', color:'var(--blue)'  },
+          { type:'payments', label:'Payment Records',    icon:'₱',  color:'var(--text)'  },
+        ].map(r=>`
+          <div class="card" style="cursor:pointer;">
+            <div class="card-header">
+              <span class="card-title">${r.label}</span>
+              <span style="font-size:22px;">${r.icon}</span>
+            </div>
+            <div class="card-body">
+              <div style="display:flex;gap:10px;margin-top:14px;">
+                <button class="btn-action secondary" style="flex:1;" onclick="downloadReport('${r.type}','csv')">⬇ CSV</button>
+                <button class="btn-action secondary" style="flex:1;" onclick="downloadReport('${r.type}','json')">⬇ JSON</button>
+              </div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+  `);
+}
+
+function downloadReport(type, format) {
+  const token = getToken();
+  const url = `${API}/reports/${type}?format=${format}`;
+  // Trigger download via anchor
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `jusbooks_${type}_report.${format}`;
+  // Attach auth header via fetch then blob download
+  fetch(url, { headers: { 'Authorization': 'Bearer ' + token } })
+    .then(r => r.blob())
+    .then(blob => {
+      const blobUrl = URL.createObjectURL(blob);
+      a.href = blobUrl;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      showToast(`${type} report downloaded`, 'success');
+    })
+    .catch(() => showToast('Report generation failed','error'));
+}
+
+async function renderNotifications() {
+  setContent('<div style="padding:40px;text-align:center;color:var(--text-muted);">Loading…</div>');
+  try {
+    const [members, log] = await Promise.all([GET('/members'), GET('/notifications')]);
+    const templates = ['due_reminder','overdue','membership_activated'];
+    setContent(`
+      <div class="page-header">
+        <div class="page-title"><h2>Notifications</h2><p>Email notification log (F10)</p></div>
+      </div>
+      <div class="page-body">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Send Notification</span></div>
+          <div class="card-body">
+            <div class="input-row">
+              <div class="form-group">
+                <label>Recipient Member</label>
+                <select id="notifMember">
+                  ${members.filter(m=>m.membershipStatus==='active').map(m=>`<option value="${m.userID}">${m.username}</option>`).join('')}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Template</label>
+                <select id="notifTemplate">
+                  ${templates.map(t=>`<option value="${t}">${t.replace(/_/g,' ')}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <button class="btn-action primary" onclick="sendNotif()">Send Notification</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Notification Log</span></div>
+          <div class="card-body" style="padding:0;">
+            <table class="data-table">
+              <thead><tr><th>Type</th><th>Recipient</th><th>Sent At</th></tr></thead>
+              <tbody>
+                ${log.length ? log.map(n=>`
+                  <tr>
+                    <td>${n.type}</td>
+                    <td>${n.recipient}</td>
+                    <td>${n.sentAt?.slice(0,16)||''}</td>
+                  </tr>`).join('')
+                : '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:16px;">No notifications sent yet.</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `);
+  } catch(e) { showToast('Failed to load notifications: ' + e.message, 'error'); }
+}
+
+async function sendNotif() {
+  const memberID = document.getElementById('notifMember').value;
+  const type     = document.getElementById('notifTemplate').value;
+  try {
+    const result = await POST('/notifications/send', { memberID: parseInt(memberID), type });
+    showToast(result.message, 'success');
+    renderNotifications();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+// ════════════════════════════════════════════════
+// MEMBER PAGES
+// ════════════════════════════════════════════════
+async function renderCatalog() {
+  setContent('<div style="padding:40px;text-align:center;color:var(--text-muted);">Loading catalog…</div>');
+  try {
+    const books = await GET('/books');
+    window._catalogBooks = books;
+    setContent(`
+      <div class="page-header">
+        <div class="page-title"><h2>Browse Catalog</h2><p>Discover and borrow books</p></div>
+      </div>
+      <div class="page-body">
+        <div class="search-bar">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" placeholder="Search by title, author, ISBN…" oninput="filterCatalog(this.value)">
+          </div>
+          <select class="filter-select" id="catalogCatFilter" onchange="filterCatalog(document.querySelector('.search-input-wrap input').value)">
+            <option value="">All Categories</option>
+            ${[...new Set(books.map(b=>b.category))].map(c=>`<option>${c}</option>`).join('')}
+          </select>
+          <select class="filter-select" id="catalogAvailFilter" onchange="filterCatalog(document.querySelector('.search-input-wrap input').value)">
+            <option value="">All Books</option>
+            <option value="available">Available Only</option>
+          </select>
+        </div>
+        <div class="book-grid" id="catalogGrid">${renderBookCards(books)}</div>
+      </div>
+    `);
+  } catch(e) { showToast('Failed to load catalog: ' + e.message, 'error'); }
+}
+
+function renderBookCards(books) {
+  if (!books.length) return '<div style="color:var(--text-muted);padding:24px;">No books found.</div>';
+  return books.map((b,i)=>{
+    const color = BOOK_COLORS[i % BOOK_COLORS.length];
+    return `<div class="book-card" onclick="openBorrowModal(${b.bookID})">
+      <div class="book-spine" style="background:${color};">
+        <span style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.8px;">${b.category}</span>
+      </div>
+      <div class="book-card-body">
+        <div class="book-card-title">${b.title}</div>
+        <div class="book-card-author">${b.author}</div>
+        <div class="book-card-footer">
+          <span class="badge ${b.availableQty>0?'available':'unavailable'}" style="font-size:10px;padding:2px 8px;">${b.availableQty>0?'Available':'Out'}</span>
+          <span class="book-qty"><span class="qty-num">${b.availableQty}</span>/${b.quantity}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterCatalog(kw) {
+  const cat   = document.getElementById('catalogCatFilter')?.value || '';
+  const avail = document.getElementById('catalogAvailFilter')?.value || '';
+  const filtered = (window._catalogBooks||[]).filter(b=>
+    (!kw || b.title.toLowerCase().includes(kw.toLowerCase()) || b.author.toLowerCase().includes(kw.toLowerCase())) &&
+    (!cat || b.category === cat) &&
+    (avail !== 'available' || b.availableQty > 0)
+  );
+  const grid = document.getElementById('catalogGrid');
+  if (grid) grid.innerHTML = renderBookCards(filtered);
+}
+
+async function openBorrowModal(bookID) {
+  const books = window._catalogBooks || [];
+  const bk = books.find(b=>b.bookID===bookID);
+  if (!bk) return;
+  if (bk.availableQty <= 0) {
+    // Offer to reserve instead
+    if (confirm(`"${bk.title}" is unavailable. Reserve it?`)) {
+      await reserveBook(bookID, bk.title);
+    }
+    return;
+  }
+  borrowTarget = bk;
+  document.getElementById('borrowBookTitle').textContent  = bk.title;
+  document.getElementById('borrowBookAuthor').textContent = bk.author + ' · ' + bk.category;
+  openModal('borrowModal');
+}
+
+async function confirmBorrow() {
+  if (!borrowTarget) return;
+  const days = parseInt(document.getElementById('borrowDays').value) || 14;
+  try {
+    await POST('/borrow', { bookID: borrowTarget.bookID, loanDays: days });
+    closeModal('borrowModal');
+    showToast(`Borrowed "${borrowTarget.title}" — due in ${days} days`, 'success');
+    borrowTarget = null;
+    renderCatalog();
+  } catch(e) {
+    closeModal('borrowModal');
+    showToast(e.message, 'error');
+  }
+}
+
+async function reserveBook(bookID, title) {
+  try {
+    await POST('/reserve', { bookID });
+    showToast(`"${title}" reserved — you'll be notified when available`, 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function renderMyBorrows() {
+  setContent('<div style="padding:40px;text-align:center;color:var(--text-muted);">Loading…</div>');
+  try {
+    const txns = await GET('/my/borrows');
+    setContent(`
+      <div class="page-header">
+        <div class="page-title"><h2>My Borrows</h2><p>Currently checked-out books</p></div>
+        <div class="header-actions"><button class="btn-action gold" onclick="navigateTo('catalog')">Browse Catalog</button></div>
+      </div>
+      <div class="page-body">
+        ${txns.length ? `
+          <div class="card">
+            <table class="data-table">
+              <thead><tr><th>Book</th><th>Borrowed On</th><th>Due Date</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody>
+                ${txns.map(t=>{
+                  const overdue  = new Date() > new Date(t.dueDate);
+                  const daysLeft = Math.round((new Date(t.dueDate)-new Date())/(1000*60*60*24));
+                  return `<tr>
+                    <td><div class="book-title">${t.bookTitle}</div></td>
+                    <td style="font-size:13px;">${t.issueDate?.slice(0,10)||''}</td>
+                    <td style="font-size:13px;color:${overdue?'var(--red)':'var(--text)'};">
+                      ${t.dueDate?.slice(0,10)||''}
+                      ${!overdue?`<span style="font-size:11px;color:var(--text-muted);">(${daysLeft}d left)</span>`:''}
+                    </td>
+                    <td><span class="badge ${overdue?'overdue':'active'}">${overdue?'Overdue':'Active'}</span></td>
+                    <td><button class="btn-action secondary btn-sm" onclick="returnMyBook(${t.transactionID})">Return</button></td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>`
+        : '<div class="empty-state"><div class="empty-icon">📚</div><p>No books currently borrowed.</p></div>'}
+      </div>
+    `);
+  } catch(e) { showToast('Failed to load borrows: ' + e.message, 'error'); }
+}
+
+async function returnMyBook(id) {
+  try {
+    const result = await POST(`/return/${id}`);
+    showToast(result.message, result.fine ? 'error' : 'success');
+    renderMyBorrows();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function renderMyReserves() {
+  setContent('<div style="padding:40px;text-align:center;color:var(--text-muted);">Loading…</div>');
+  try {
+    const reserves = await GET('/my/reserves');
+    setContent(`
+      <div class="page-header">
+        <div class="page-title"><h2>Reservations</h2><p>Books on hold for you</p></div>
+        <div class="header-actions"><button class="btn-action gold" onclick="navigateTo('catalog')">Browse Catalog</button></div>
+      </div>
+      <div class="page-body">
+        ${reserves.length ? `
+          <div class="card">
+            <table class="data-table">
+              <thead><tr><th>Book</th><th>Reserved On</th><th>Expires</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody>
+                ${reserves.map(r=>`
+                  <tr>
+                    <td><div class="book-title">${r.bookTitle}</div></td>
+                    <td style="font-size:13px;">${r.reservedAt?.slice(0,10)||''}</td>
+                    <td style="font-size:13px;">${r.expiryDate?.slice(0,10)||''}</td>
+                    <td><span class="badge ${r.status}">${r.status}</span></td>
+                    <td><button class="btn-action danger btn-sm" onclick="cancelReserve(${r.reservationID})">Cancel</button></td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`
+        : '<div class="empty-state"><div class="empty-icon">🔖</div><p>No active reservations.</p><p style="font-size:13px;margin-top:6px;">When a book is unavailable, click it in the catalog to reserve it.</p></div>'}
+      </div>
+    `);
+  } catch(e) { showToast('Failed to load reservations: ' + e.message, 'error'); }
+}
+
+async function cancelReserve(id) {
+  try {
+    await DELETE(`/reserve/${id}`);
+    showToast('Reservation cancelled','info');
+    renderMyReserves();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function renderMyFines() {
+  setContent('<div style="padding:40px;text-align:center;color:var(--text-muted);">Loading…</div>');
+  try {
+    const fines = await GET('/my/fines');
+    const total = fines.filter(f=>!f.isPaid).reduce((s,f)=>s+Number(f.amount),0);
+    setContent(`
+      <div class="page-header">
+        <div class="page-title"><h2>My Fines</h2><p>Outstanding balances</p></div>
+      </div>
+      <div class="page-body">
+        ${total > 0 ? `
+          <div class="fine-display" style="max-width:360px;margin-bottom:20px;">
+            <div class="fine-amount">₱${total.toFixed(2)}</div>
+            <div class="fine-detail">Total outstanding fine</div>
+            <button class="btn-action primary" style="margin-top:14px;padding:10px 28px;" onclick="openPayModal(${total})">Pay Now</button>
+          </div>` : `
+          <div style="background:var(--green-pale);border:1px solid #b7dfbe;border-radius:var(--radius);padding:14px;margin-bottom:18px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">✓</span>
+            <div><strong>No outstanding fines!</strong> Your account is in good standing.</div>
+          </div>`}
+        ${fines.length ? `
+          <div class="card">
+            <table class="data-table">
+              <thead><tr><th>Book</th><th>Days Overdue</th><th>Amount</th><th>Status</th></tr></thead>
+              <tbody>
+                ${fines.map(f=>`
+                  <tr>
+                    <td>${f.bookTitle}</td>
+                    <td>${f.daysOverdue} days</td>
+                    <td style="font-weight:600;color:${f.isPaid?'var(--green)':'var(--red)'};">₱${Number(f.amount).toFixed(2)}</td>
+                    <td><span class="badge ${f.isPaid?'paid':'unpaid'}">${f.isPaid?'Paid':'Unpaid'}</span></td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`
+        : '<div class="empty-state"><div class="empty-icon">✓</div><p>No fine history.</p></div>'}
+      </div>
+    `);
+  } catch(e) { showToast('Failed to load fines: ' + e.message, 'error'); }
+}
+
+function openPayModal(amount) {
+  document.getElementById('payFineAmt').textContent    = '₱' + Number(amount).toFixed(2);
+  document.getElementById('payFineDetail').textContent = 'Total outstanding fine';
+  selectedPayMethod = '';
+  document.querySelectorAll('.payment-method').forEach(el=>el.classList.remove('selected'));
+  openModal('payModal');
+}
+
+function selectPayMethod(method, el) {
+  selectedPayMethod = method;
+  document.querySelectorAll('.payment-method').forEach(e=>e.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+async function processPay() {
+  if (!selectedPayMethod) { showToast('Please select a payment method','error'); return; }
+  const amtText = document.getElementById('payFineAmt').textContent.replace('₱','');
+  const amount  = parseFloat(amtText) || 0;
+  try {
+    const result = await POST('/pay', { amount, method: selectedPayMethod, type: 'fine' });
+    closeModal('payModal');
+    showToast(`Payment confirmed! Ref: ${result.referenceID}`, 'success');
+    renderMyFines();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function renderHistory() {
+  setContent('<div style="padding:40px;text-align:center;color:var(--text-muted);">Loading…</div>');
+  try {
+    const history = await GET('/my/history');
+    const returned = history.filter(t=>t.status==='returned');
+    setContent(`
+      <div class="page-header">
+        <div class="page-title"><h2>History</h2><p>Past borrowing activity</p></div>
+      </div>
+      <div class="page-body">
+        ${returned.length ? `
+          <div class="card">
+            <table class="data-table">
+              <thead><tr><th>Book</th><th>Borrowed</th><th>Returned</th><th>Status</th></tr></thead>
+              <tbody>
+                ${returned.map(t=>`
+                  <tr>
+                    <td><div class="book-title">${t.bookTitle}</div></td>
+                    <td style="font-size:13px;">${t.issueDate?.slice(0,10)||''}</td>
+                    <td style="font-size:13px;">${t.returnDate?.slice(0,10)||'—'}</td>
+                    <td><span class="badge returned">Returned</span></td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`
+        : '<div class="empty-state"><div class="empty-icon">⏱</div><p>No borrowing history yet.</p></div>'}
+      </div>
+    `);
+  } catch(e) { showToast('Failed to load history: ' + e.message, 'error'); }
+}
+
+// ════════════════════════════════════════════════
+// UTILITIES
+// ════════════════════════════════════════════════
+function setContent(html) {
+  document.getElementById('mainContent').innerHTML = html;
+}
+
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function showToast(msg, type='info') {
+  const toast = document.getElementById('toast');
+  toast.className = `toast ${type}`;
+  document.getElementById('toastMsg').textContent = msg;
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'), 3500);
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el=>{
+  el.addEventListener('click', e=>{ if(e.target===el) el.classList.remove('open'); });
+});
+</script>
+</body>
+</html>
