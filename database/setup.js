@@ -7,7 +7,12 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
-    role TEXT NOT NULL
+    role TEXT NOT NULL,
+    membership_status TEXT DEFAULT 'active',
+    borrow_limit INTEGER DEFAULT 5,
+    outstanding_fines REAL DEFAULT 0,
+    staff_id TEXT,
+    department TEXT
 );
 `;
 
