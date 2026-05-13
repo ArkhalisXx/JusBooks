@@ -298,14 +298,6 @@ async function insertPayment(data) {
   return { paymentID: lastID };
 }
 
-async function confirmPayment(paymentID) {
-  return run(`UPDATE payments SET status = 'confirmed' WHERE payment_id = ?`, [paymentID]);
-}
-
-async function getPaymentByID(paymentID) {
-  return get(`SELECT * FROM payments WHERE payment_id = ?`, [paymentID]);
-}
-
 async function getAllPayments() {
   return all(
     `SELECT p.payment_id AS paymentID, p.member_id AS memberID,
@@ -424,7 +416,7 @@ module.exports = {
   insertTransaction, updateTransaction, getTransactionByID,
   getActiveTransactionsByMember, getBorrowCountByMember, getAllTransactions, getMemberHistory,
   insertFine, getFinesByMember, getAllFines, markFinesPaid,
-  insertPayment, getAllPayments, confirmPayment, getPaymentByID,
+  insertPayment, getAllPayments,
   insertReservation, updateReservationStatus, getReservationsByMember, getAllReservations,
   logNotification, getAllNotifications,
   getDashboardStats, getRecentActivity,

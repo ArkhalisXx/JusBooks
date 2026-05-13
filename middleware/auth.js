@@ -73,19 +73,12 @@ function authenticate(req, res, next) {
 
   // Live DB check — catches suspensions/deactivations that happened after login
   db.get(
-    `SELECT is_active, is_suspended FROM users WHERE user_id = ?`,
+    `SELECT user_id FROM users WHERE user_id = ?`,
     [decoded.userID],
     (err, row) => {
       if (err || !row) {
         return res.status(401).json({ error: 'User account not found.' });
       }
-      if (row.is_active === 0) {
-        return res.status(403).json({ error: 'Account has been deactivated. Contact the librarian.' });
-      }
-      if (row.is_suspended === 1) {
-        return res.status(403).json({ error: 'Account is suspended. Please settle outstanding obligations.' });
-      }
-
       req.user = decoded;
       next();
     }
@@ -122,13 +115,13 @@ function optionalAuth(req, res, next) {
     return next();
   }
 
-  // Still do a live check — don't let suspended users get member-level data
+  // Still do a live check — don't let deleted users get member-level data
   db.get(
-    `SELECT is_active, is_suspended FROM users WHERE user_id = ?`,
+    `SELECT user_id FROM users WHERE user_id = ?`,
     [decoded.userID],
     (err, row) => {
-      if (err || !row || row.is_active === 0 || row.is_suspended === 1) {
-        req.user = null; // treat as guest if account is invalid
+      if (err || !row) {
+        req.user = null;
       } else {
         req.user = decoded;
       }
