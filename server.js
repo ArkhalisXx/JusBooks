@@ -328,67 +328,29 @@ app.post('/api/pay', authenticate, authorize('member'), async (req, res) => {
     const memberRow = await db.findUserByID(req.user.userID);
     if (!memberRow) return err(res, 404, 'Member not found.');
 
-    // Counter payments are pending until librarian confirms
-    const isCounter = method === 'counter';
-    const status    = isCounter ? 'pending' : 'confirmed';
-
-    const refPrefix = { gcash: 'GC', paypal: 'PP', card: 'CD', counter: 'CT' }[method] || 'TX';
+    const refPrefix = { gcash: 'GC', paypal: 'PP', card: 'CD' }[method] || 'TX';
     const referenceID = `${refPrefix}-${Date.now().toString().slice(-6)}`;
 
     const { paymentID } = await db.insertPayment({
       memberID: req.user.userID, fineID: null,
-      amount, method, type, status, referenceID,
+      amount, method, type,
+      status: 'confirmed', referenceID,
     });
 
-    // Only clear fines immediately for digital payments
-    if (!isCounter) {
-      if (type === 'fine') {
-        await db.markFinesPaid(req.user.userID);
-        await db.updateMemberFines(req.user.userID, -memberRow.outstandingFines);
-      }
-      if (type === 'membership') {
-        await db.updateMemberStatus(req.user.userID, 'active');
-      }
-      Notification.sendPaymentConfirmation(
-        memberRow.email, memberRow.username, amount, method, referenceID
-      ).catch(() => {});
+    if (type === 'fine') {
+      await db.markFinesPaid(req.user.userID);
+      await db.updateMemberFines(req.user.userID, -memberRow.outstandingFines);
     }
 
-    res.json({
-      message: isCounter
-        ? 'Counter payment submitted. Please visit the library desk for confirmation.'
-        : 'Payment confirmed.',
-      paymentID, referenceID, status,
-    });
-  } catch (e) {
-    err(res, 500, e.message);
-  }
-});
-
-// POST /api/pay/confirm/:paymentID — librarian confirms counter payment
-app.post('/api/pay/confirm/:paymentID', authenticate, authorize('librarian'), async (req, res) => {
-  try {
-    const { memberID } = req.body;
-    if (!memberID) return err(res, 400, 'memberID required.');
-
-    // Confirm the payment
-    await db.confirmPayment(req.params.paymentID);
-
-    // Clear fines
-    const memberRow = await db.findUserByID(memberID);
-    if (memberRow) {
-      await db.markFinesPaid(memberID);
-      await db.updateMemberFines(memberID, -memberRow.outstandingFines);
-
-      const payment = await db.getPaymentByID(req.params.paymentID);
-
-      Notification.sendPaymentConfirmation(
-        memberRow.email, memberRow.username,
-        payment?.amount || 0, 'Cash (Counter)', payment?.reference_id || ''
-      ).catch(() => {});
+    if (type === 'membership') {
+      await db.updateMemberStatus(req.user.userID, 'active');
     }
 
-    res.json({ message: 'Counter payment confirmed.' });
+    Notification.sendPaymentConfirmation(
+      memberRow.email, memberRow.username, amount, method, referenceID
+    ).catch(() => {});
+
+    res.json({ message: 'Payment confirmed.', paymentID, referenceID });
   } catch (e) {
     err(res, 500, e.message);
   }
