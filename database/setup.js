@@ -103,6 +103,37 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 `;
 
+// ── BORROW REQUESTS TABLE ─────────────────────────────────────────────────────
+const borrowRequestsTable = `
+CREATE TABLE IF NOT EXISTS borrow_requests (
+    request_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id      INTEGER NOT NULL,
+    book_id        INTEGER NOT NULL,
+    loan_days      INTEGER DEFAULT 14,
+    requested_at   TEXT    DEFAULT (datetime('now')),
+    status         TEXT    DEFAULT 'pending',
+    FOREIGN KEY(member_id) REFERENCES users(user_id),
+    FOREIGN KEY(book_id)   REFERENCES books(book_id)
+);
+`;
+
+// ── RETURN REQUESTS TABLE ─────────────────────────────────────────────────────
+const returnRequestsTable = `
+CREATE TABLE IF NOT EXISTS return_requests (
+    request_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    transaction_id INTEGER NOT NULL,
+    member_id      INTEGER NOT NULL,
+    requested_at   TEXT    DEFAULT (datetime('now')),
+    status         TEXT    DEFAULT 'pending',
+    fine_amount    REAL    DEFAULT 0,
+    days_overdue   INTEGER DEFAULT 0,
+    fine_paid      INTEGER DEFAULT 0,
+    payment_method TEXT,
+    FOREIGN KEY(transaction_id) REFERENCES borrow_transactions(transaction_id),
+    FOREIGN KEY(member_id)      REFERENCES users(user_id)
+);
+`;
+
 // ── REFRESH TOKENS TABLE ──────────────────────────────────────────────────────
 // Auth & RBAC Module — stores hashed refresh tokens for secure session rotation
 const refreshTokensTable = `
@@ -140,8 +171,10 @@ const queries = [
   paymentsTable,
   reservationsTable,
   notificationsTable,
-  refreshTokensTable,   // Auth & RBAC module
-  auditLogsTable,       // Auth & RBAC module
+  borrowRequestsTable,
+  returnRequestsTable,
+  refreshTokensTable,
+  auditLogsTable,
 ];
 
 queries.forEach((query) => {

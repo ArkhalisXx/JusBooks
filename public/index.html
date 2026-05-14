@@ -641,12 +641,12 @@
         </select>
       </div>
       <div style="background:var(--blue-pale);border:1px solid rgba(58,155,213,0.25);border-radius:var(--radius);padding:11px;font-size:13px;color:var(--text-soft);">
-        <strong>Late fine policy:</strong> ₱5.00 per day overdue. Please return on time to avoid fines.
+        <strong>Note:</strong> This is a borrow request. Visit the library to pick up the book once submitted. Late fine: ₱5.00/day.
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn-action secondary" onclick="closeModal('borrowModal')">Cancel</button>
-      <button class="btn-action gold" onclick="confirmBorrow()">Confirm Borrow</button>
+      <button class="btn-action gold" onclick="confirmBorrow()">Submit Request</button>
     </div>
   </div>
 </div>
@@ -831,7 +831,13 @@ function enterApp() {
   document.getElementById('sidebarAvatar').textContent =
     currentUser.username.split(' ').map(w=>w[0]).join('').substring(0,2);
   document.getElementById('sidebarName').textContent = currentUser.username;
-  document.getElementById('sidebarRole').textContent = currentRole === 'librarian' ? 'Librarian' : 'Member';
+  if (currentRole === 'librarian') {
+    document.getElementById('sidebarRole').textContent = 'Librarian';
+  } else {
+    const status = currentUser.membershipStatus || 'pending';
+    const labels = { active: 'Member', pending: 'Pending Activation', suspended: 'Suspended' };
+    document.getElementById('sidebarRole').textContent = labels[status] || 'Member';
+  }
   buildNav();
   navigateTo(currentRole === 'librarian' ? 'dashboard' : 'catalog');
 }
@@ -848,13 +854,15 @@ function doLogout() {
 // NAVIGATION
 // ════════════════════════════════════════════════
 const LIBRARIAN_NAV = [
-  { id:'dashboard',     icon:'◈',  label:'Dashboard',     section:'Overview'    },
-  { id:'books',         icon:'📖', label:'Books',         section:'Management'  },
-  { id:'members',       icon:'👥', label:'Members'                              },
-  { id:'transactions',  icon:'↔',  label:'Transactions'                         },
-  { id:'fines',         icon:'⚠',  label:'Fines'                                },
-  { id:'reports',       icon:'📊', label:'Reports',       section:'Tools'       },
-  { id:'notifications', icon:'🔔', label:'Notifications'                        },
+  { id:'dashboard',     icon:'◈',  label:'Dashboard',        section:'Overview'    },
+  { id:'books',         icon:'📖', label:'Books',             section:'Management'  },
+  { id:'members',       icon:'👥', label:'Members'                                  },
+  { id:'transactions',  icon:'↔',  label:'Transactions'                             },
+  { id:'borrowreqs',    icon:'📥', label:'Borrow Requests'                          },
+  { id:'returnreqs',    icon:'📦', label:'Return Requests'                          },
+  { id:'fines',         icon:'⚠',  label:'Fines'                                    },
+  { id:'reports',       icon:'📊', label:'Reports',           section:'Tools'       },
+  { id:'notifications', icon:'🔔', label:'Notifications'                            },
 ];
 
 const MEMBER_NAV = [
@@ -892,6 +900,8 @@ function navigateTo(page) {
     books:         renderBooks,
     members:       renderMembers,
     transactions:  renderTransactions,
+    borrowreqs:    renderBorrowRequests,
+    returnreqs:    renderReturnRequests,
     fines:         renderFines,
     reports:       renderReports,
     notifications: renderNotifications,
@@ -1054,13 +1064,15 @@ async function saveBook() {
   const ISBN     = document.getElementById('bkISBN').value.trim();
   const category = document.getElementById('bkCategory').value;
   const quantity = parseInt(document.getElementById('bkQty').value) || 0;
+  const availableQtyRaw = parseInt(document.getElementById('bkAvailQty').value);
+  const availableQty = isNaN(availableQtyRaw) ? quantity : availableQtyRaw;
   const description = document.getElementById('bkDesc').value.trim();
 
   if (!title||!author||!ISBN||!category||!quantity) { showToast('Please fill all required fields','error'); return; }
 
   try {
     if (editBookId) {
-      await PUT(`/books/${editBookId}`, { title, author, ISBN, category, quantity, description });
+      await PUT(`/books/${editBookId}`, { title, author, ISBN, category, quantity, availableQty, description });
       showToast('Book updated successfully','success');
     } else {
       await POST('/books', { title, author, ISBN, category, quantity, description });
@@ -1198,9 +1210,166 @@ async function renderTransactions() {
 
 async function markReturned(id) {
   try {
-    const result = await POST(`/return/${id}`);
-    showToast(result.message, result.fine ? 'error' : 'success');
+    const result = await POST(`/admin/return/${id}`);
+    showToast(result.message, result.fine ? 'warning' : 'success');
     renderTransactions();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function renderBorrowRequests() {
+  setContent('<div style="padding:40px;text-align:center;color:var(--text-muted);">Loading borrow requests…</div>');
+  try {
+    const requests = await GET('/borrow-requests');
+    const pending  = requests.filter(r => r.status === 'pending');
+    const done     = requests.filter(r => r.status !== 'pending');
+    setContent(`
+      <div class="page-header">
+        <div class="page-title"><h2>Borrow Requests</h2><p>Members requesting to borrow books</p></div>
+      </div>
+      <div class="page-body">
+        <div class="card" style="margin-bottom:20px;">
+          <div style="padding:14px 18px;border-bottom:1px solid var(--border);font-weight:600;">Pending (${pending.length})</div>
+          ${pending.length ? `
+          <table class="data-table">
+            <thead><tr><th>Member</th><th>Book</th><th>Stock</th><th>Loan Days</th><th>Requested</th><th>Actions</th></tr></thead>
+            <tbody>
+              ${pending.map(r => `
+                <tr>
+                  <td>${r.username}<div style="font-size:11px;color:var(--text-muted);">${r.email}</div></td>
+                  <td>${r.bookTitle}</td>
+                  <td><span class="badge ${r.availableQty > 0 ? 'available' : 'unavailable'}">${r.availableQty} available</span></td>
+                  <td>${r.loanDays} days</td>
+                  <td style="font-size:12px;">${r.requestedAt?.slice(0,10)||''}</td>
+                  <td style="display:flex;gap:6px;">
+                    <button class="btn-action secondary btn-sm"
+                      onclick="libAcceptBorrow(${r.requestID})"
+                      ${r.availableQty <= 0 ? 'disabled title="Book not in stock"' : ''}>
+                      Accept
+                    </button>
+                    <button class="btn-action danger btn-sm" onclick="libRejectBorrow(${r.requestID})">Reject</button>
+                  </td>
+                </tr>`).join('')}
+            </tbody>
+          </table>` : '<div style="padding:20px;color:var(--text-muted);text-align:center;">No pending borrow requests.</div>'}
+        </div>
+        <div class="card">
+          <div style="padding:14px 18px;border-bottom:1px solid var(--border);font-weight:600;">Completed (${done.length})</div>
+          ${done.length ? `
+          <table class="data-table">
+            <thead><tr><th>Member</th><th>Book</th><th>Status</th><th>Requested</th></tr></thead>
+            <tbody>
+              ${done.map(r => `
+                <tr>
+                  <td>${r.username}</td>
+                  <td>${r.bookTitle}</td>
+                  <td><span class="badge ${r.status}">${r.status}</span></td>
+                  <td style="font-size:12px;">${r.requestedAt?.slice(0,10)||''}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>` : '<div style="padding:20px;color:var(--text-muted);text-align:center;">No completed requests yet.</div>'}
+        </div>
+      </div>
+    `);
+  } catch(e) { showToast('Failed to load borrow requests: ' + e.message, 'error'); }
+}
+
+async function libAcceptBorrow(requestID) {
+  try {
+    const result = await POST(`/borrow-requests/${requestID}/accept`);
+    showToast(result.message, 'success');
+    renderBorrowRequests();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function libRejectBorrow(requestID) {
+  if (!confirm('Reject this borrow request?')) return;
+  try {
+    const result = await POST(`/borrow-requests/${requestID}/reject`);
+    showToast(result.message, 'info');
+    renderBorrowRequests();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function renderReturnRequests() {
+  setContent('<div style="padding:40px;text-align:center;color:var(--text-muted);">Loading return requests…</div>');
+  try {
+    const requests = await GET('/return-requests');
+    const pending  = requests.filter(r => r.status === 'pending');
+    const done     = requests.filter(r => r.status === 'returned');
+    setContent(`
+      <div class="page-header">
+        <div class="page-title"><h2>Return Requests</h2><p>Books members have requested to return</p></div>
+      </div>
+      <div class="page-body">
+        <div class="card" style="margin-bottom:20px;">
+          <div style="padding:14px 18px;border-bottom:1px solid var(--border);font-weight:600;">Pending (${pending.length})</div>
+          ${pending.length ? `
+          <table class="data-table">
+            <thead><tr><th>Member</th><th>Book</th><th>Requested</th><th>Fine</th><th>Fine Paid</th><th>Actions</th></tr></thead>
+            <tbody>
+              ${pending.map(r => `
+                <tr>
+                  <td>${r.username}<div style="font-size:11px;color:var(--text-muted);">${r.email}</div></td>
+                  <td>${r.bookTitle}</td>
+                  <td style="font-size:12px;">${r.requestedAt?.slice(0,10)||''}</td>
+                  <td style="font-weight:600;color:${r.fineAmount>0?'var(--red)':'var(--green)'};">
+                    ${r.fineAmount > 0 ? '₱'+Number(r.fineAmount).toFixed(2) : '—'}
+                  </td>
+                  <td>
+                    ${r.fineAmount > 0
+                      ? (r.finePaid
+                          ? '<span class="badge active">Paid</span>'
+                          : `<span class="badge overdue">Unpaid</span>`)
+                      : '—'}
+                  </td>
+                  <td style="display:flex;gap:6px;flex-wrap:wrap;">
+                    ${r.fineAmount > 0 && !r.finePaid
+                      ? `<button class="btn-action gold btn-sm" onclick="libMarkFinePaid(${r.requestID})">Mark Fine Paid</button>`
+                      : ''}
+                    <button class="btn-action secondary btn-sm"
+                      onclick="libAcceptReturn(${r.requestID})"
+                      ${r.fineAmount > 0 && !r.finePaid ? 'disabled title="Settle fine first"' : ''}>
+                      Accept Return
+                    </button>
+                  </td>
+                </tr>`).join('')}
+            </tbody>
+          </table>` : '<div style="padding:20px;color:var(--text-muted);text-align:center;">No pending return requests.</div>'}
+        </div>
+        <div class="card">
+          <div style="padding:14px 18px;border-bottom:1px solid var(--border);font-weight:600;">Completed (${done.length})</div>
+          ${done.length ? `
+          <table class="data-table">
+            <thead><tr><th>Member</th><th>Book</th><th>Requested</th><th>Fine</th></tr></thead>
+            <tbody>
+              ${done.map(r => `
+                <tr>
+                  <td>${r.username}</td>
+                  <td>${r.bookTitle}</td>
+                  <td style="font-size:12px;">${r.requestedAt?.slice(0,10)||''}</td>
+                  <td style="color:var(--text-muted);">${r.fineAmount > 0 ? '₱'+Number(r.fineAmount).toFixed(2) : '—'}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>` : '<div style="padding:20px;color:var(--text-muted);text-align:center;">No completed returns yet.</div>'}
+        </div>
+      </div>
+    `);
+  } catch(e) { showToast('Failed to load return requests: ' + e.message, 'error'); }
+}
+
+async function libMarkFinePaid(requestID) {
+  try {
+    const result = await POST(`/return-requests/${requestID}/mark-paid`);
+    showToast(result.message, 'success');
+    renderReturnRequests();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function libAcceptReturn(requestID) {
+  try {
+    const result = await POST(`/return-requests/${requestID}/accept`);
+    showToast(result.message, 'success');
+    renderReturnRequests();
   } catch(e) { showToast(e.message, 'error'); }
 }
 
@@ -1419,8 +1588,7 @@ async function openBorrowModal(bookID) {
   const bk = books.find(b=>b.bookID===bookID);
   if (!bk) return;
   if (bk.availableQty <= 0) {
-    // Offer to reserve instead
-    if (confirm(`"${bk.title}" is unavailable. Reserve it?`)) {
+    if (confirm(`"${bk.title}" is currently unavailable. Would you like to reserve it? You'll be notified when it's ready.`)) {
       await reserveBook(bookID, bk.title);
     }
     return;
@@ -1437,7 +1605,7 @@ async function confirmBorrow() {
   try {
     await POST('/borrow', { bookID: borrowTarget.bookID, loanDays: days });
     closeModal('borrowModal');
-    showToast(`Borrowed "${borrowTarget.title}" — due in ${days} days`, 'success');
+    showToast(`Borrow request submitted for "${borrowTarget.title}". Visit the library to pick it up!`, 'success');
     borrowTarget = null;
     renderCatalog();
   } catch(e) {
@@ -1479,7 +1647,7 @@ async function renderMyBorrows() {
                       ${!overdue?`<span style="font-size:11px;color:var(--text-muted);">(${daysLeft}d left)</span>`:''}
                     </td>
                     <td><span class="badge ${overdue?'overdue':'active'}">${overdue?'Overdue':'Active'}</span></td>
-                    <td><button class="btn-action secondary btn-sm" onclick="returnMyBook(${t.transactionID})">Return</button></td>
+                    <td><button class="btn-action secondary btn-sm" onclick="returnMyBook(${t.transactionID})">Request Return</button></td>
                   </tr>`;
                 }).join('')}
               </tbody>
@@ -1494,9 +1662,36 @@ async function renderMyBorrows() {
 async function returnMyBook(id) {
   try {
     const result = await POST(`/return/${id}`);
-    showToast(result.message, result.fine ? 'error' : 'success');
-    renderMyBorrows();
+    if (result.isOverdue) {
+      showReturnFineModal(id, result.requestID, result.fineAmount, result.daysOverdue);
+    } else {
+      showToast('Return request submitted. Bring the book to the library.', 'success');
+      renderMyBorrows();
+    }
   } catch(e) { showToast(e.message, 'error'); }
+}
+
+function showReturnFineModal(txID, requestID, fineAmount, daysOverdue) {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay active';
+  modal.id = 'returnFineModal';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-header">
+        <span class="modal-title">⚠️ Overdue Fine</span>
+        <button class="modal-close" onclick="document.getElementById('returnFineModal').remove();renderMyBorrows();">×</button>
+      </div>
+      <div class="modal-body">
+        <p>Your return request has been submitted, but this book is <strong>${daysOverdue} day(s) overdue</strong>.</p>
+        <p style="font-size:22px;font-weight:700;color:var(--red);margin:12px 0;">Fine: ₱${Number(fineAmount).toFixed(2)}</p>
+        <p style="color:var(--text-muted);font-size:13px;">Please settle the fine before the librarian can accept your return. You can pay online now or at the counter when you bring the book in.</p>
+        <div style="display:flex;gap:10px;margin-top:18px;">
+          <button class="btn-action primary" style="flex:1;" onclick="document.getElementById('returnFineModal').remove();openPayModal(${fineAmount});renderMyBorrows();">Pay Online</button>
+          <button class="btn-action secondary" style="flex:1;" onclick="document.getElementById('returnFineModal').remove();renderMyBorrows();">Pay at Counter</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
 }
 
 async function renderMyReserves() {

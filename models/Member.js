@@ -36,9 +36,6 @@ class Member extends User {
     if (row.membershipStatus === "suspended") {
       throw new Error("Account suspended. Please settle outstanding fines to reactivate.");
     }
-    if (row.membershipStatus === "pending") {
-      throw new Error("Membership payment pending. Please complete payment to activate.");
-    }
 
     const member = new Member(
       row.userID, row.username, row.email, row.password,
@@ -63,6 +60,9 @@ class Member extends User {
    * @returns {{ eligible: boolean, reason: string|null }}
    */
   checkEligibility(currentBorrowCount) {
+    if (this.membershipStatus === "pending") {
+      return { eligible: false, reason: "Your account has not been activated yet. Please visit the library to activate your membership." };
+    }
     if (this.membershipStatus !== "active") {
       return { eligible: false, reason: `Membership is ${this.membershipStatus}.` };
     }
