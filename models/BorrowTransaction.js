@@ -54,7 +54,7 @@ class BorrowTransaction {
    *   db.updateMemberFines(memberID, amount) → Promise<void>
    * @returns {Promise<Fine|null>}
    */
-  async recordReturn(db) {
+  async recordReturn(db, skipFine = false) {
     if (this.status === "returned") {
       throw new Error(`Transaction #${this.transactionID} is already returned.`);
     }
@@ -68,6 +68,11 @@ class BorrowTransaction {
     });
 
     await db.incrementBookStock(this.bookID);
+
+    if (skipFine) {
+      console.log(`[Return] TX #${this.transactionID} — Book #${this.bookID} returned (fine handled separately).`);
+      return null;
+    }
 
     const fine = Fine.fromTransaction(
       this.memberID,

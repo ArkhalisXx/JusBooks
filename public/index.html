@@ -319,6 +319,7 @@
   .badge.active      { background: var(--green-pale); color: var(--green); }
   .badge.overdue     { background: var(--red-pale);   color: var(--red);   }
   .badge.pending     { background: var(--amber-pale); color: var(--amber); }
+  .badge.ready       { background: var(--green-pale); color: var(--green); font-weight: 600; }
   .badge.returned    { background: #f0f0f0;           color: #777;         }
   .badge.suspended   { background: var(--red-pale);   color: var(--red);   }
   .badge.paid        { background: var(--green-pale); color: var(--green); }
@@ -1684,10 +1685,9 @@ function showReturnFineModal(txID, requestID, fineAmount, daysOverdue) {
       <div class="modal-body">
         <p>Your return request has been submitted, but this book is <strong>${daysOverdue} day(s) overdue</strong>.</p>
         <p style="font-size:22px;font-weight:700;color:var(--red);margin:12px 0;">Fine: ₱${Number(fineAmount).toFixed(2)}</p>
-        <p style="color:var(--text-muted);font-size:13px;">Please settle the fine before the librarian can accept your return. You can pay online now or at the counter when you bring the book in.</p>
-        <div style="display:flex;gap:10px;margin-top:18px;">
-          <button class="btn-action primary" style="flex:1;" onclick="document.getElementById('returnFineModal').remove();openPayModal(${fineAmount});renderMyBorrows();">Pay Online</button>
-          <button class="btn-action secondary" style="flex:1;" onclick="document.getElementById('returnFineModal').remove();renderMyBorrows();">Pay at Counter</button>
+        <p style="color:var(--text-muted);font-size:13px;">Please bring the book to the library and settle the fine at the counter. The librarian will mark it as paid and complete your return.</p>
+        <div style="margin-top:18px;">
+          <button class="btn-action primary" style="width:100%;" onclick="document.getElementById('returnFineModal').remove();renderMyBorrows();">Got it</button>
         </div>
       </div>
     </div>`;
