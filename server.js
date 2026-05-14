@@ -131,8 +131,25 @@ app.put('/api/books/:id', authenticate, authorize('librarian'), async (req, res)
     const book = await db.getBookByID(req.params.id);
     if (!book) return err(res, 404, 'Book not found.');
     Book.validate(req.body);
+
+    const prevAvailableQty = book.availableQty;
     await db.updateBook(req.params.id, req.body);
     const updated = await db.getBookByID(req.params.id);
+
+    // If available qty increased, notify next member in reservation queue
+    if (updated.availableQty > prevAvailableQty) {
+      const nextReservation = await db.getNextReservationForBook(req.params.id);
+      if (nextReservation) {
+        const holdExpiry = new Date();
+        holdExpiry.setDate(holdExpiry.getDate() + 3);
+        await db.updateReservationStatus(nextReservation.reservationID, 'ready', holdExpiry.toISOString());
+        Notification.sendReservationReady(
+          nextReservation.memberEmail, nextReservation.memberName,
+          nextReservation.bookTitle, holdExpiry.toDateString()
+        ).catch(e => console.error('[ReservationReady] Email failed:', e.message));
+      }
+    }
+
     res.json(updated);
   } catch (e) {
     err(res, 400, e.message);
@@ -228,10 +245,19 @@ app.post('/api/borrow', authenticate, authorize('member'), async (req, res) => {
     );
     if (existing) return err(res, 409, 'You already have a pending borrow request for this book.');
 
-    // Block if someone else has a ready reservation for this book
+    // Block if member already has this book actively borrowed
+    const activeTransactions = await db.getActiveTransactionsByMember(req.user.userID);
+    const alreadyBorrowed = activeTransactions.some(t => t.bookID === bookID);
+    if (alreadyBorrowed) return err(res, 409, 'You already have this book borrowed.');
+
+    // Block if all available copies are spoken for by reservations
+    const reservationCount = await db.countActiveReservationsForBook(bookID);
     const nextReservation = await db.getNextReservationForBook(bookID);
-    if (nextReservation && nextReservation.memberID !== req.user.userID) {
-      return err(res, 403, `This book is currently on hold for another member who has a reservation. Please reserve it to join the queue.`);
+    const memberHasReservation = nextReservation && nextReservation.memberID === req.user.userID;
+    const freeStock = bookRow.availableQty - reservationCount;
+
+    if (!memberHasReservation && freeStock <= 0) {
+      return err(res, 403, 'All available copies are reserved. Please reserve this book to join the queue.');
     }
 
     const { requestID } = await db.insertBorrowRequest({
@@ -268,10 +294,14 @@ app.post('/api/borrow-requests/:id/accept', authenticate, authorize('librarian')
       return err(res, 400, 'Book is not available in stock.');
     }
 
-    // Block if someone else has a ready reservation for this book
+    // Block if all available copies are spoken for by someone else's reservation
+    const reservationCount = await db.countActiveReservationsForBook(request.book_id);
     const nextReservation = await db.getNextReservationForBook(request.book_id);
-    if (nextReservation && nextReservation.memberID !== request.member_id) {
-      return err(res, 403, `Cannot accept — "${nextReservation.memberName}" has a reservation on hold for this book. Accept their request first or wait for their hold to expire.`);
+    const requesterHasReservation = nextReservation && nextReservation.memberID === request.member_id;
+    const freeStock = bookRow.availableQty - reservationCount;
+
+    if (!requesterHasReservation && freeStock <= 0) {
+      return err(res, 403, `Cannot accept — "${nextReservation?.memberName}" has a reservation on hold and no free copies remain.`);
     }
 
     const memberRow = await db.findUserByID(request.member_id);
@@ -413,14 +443,17 @@ app.post('/api/return-requests/:id/accept', authenticate, authorize('librarian')
     );
 
     // Actual return — closes transaction, increments stock
-    await tx.recordReturn(db);
+    // Pass true to skip fine insertion since we handle it separately
+    await tx.recordReturn(db, true);
 
-    // If overdue and fine was paid at counter, log the fine as paid
-    if (request.fine_amount > 0 && request.fine_paid) {
+    // Only insert fine if it wasn't already inserted by mark-paid
+    if (request.fine_amount > 0 && !request.fine_paid) {
+      // This shouldn't happen since we block accept when fine is unpaid,
+      // but handle it as a safety net
       const fine = Fine.fromTransaction(txRow.memberID, txRow.transactionID, txRow.dueDate);
       if (fine) {
-        const { fineID } = await db.insertFine({ ...fine.toJSON(), is_paid: 1 });
-        await db.updateMemberFines(txRow.memberID, 0); // already settled
+        await db.insertFine({ ...fine.toJSON(), isPaid: false });
+        await db.updateMemberFines(txRow.memberID, fine.amount);
       }
     }
 
@@ -431,11 +464,11 @@ app.post('/api/return-requests/:id/accept', authenticate, authorize('librarian')
     if (nextReservation) {
       const holdExpiry = new Date();
       holdExpiry.setDate(holdExpiry.getDate() + 3);
-      await db.updateReservationStatus(nextReservation.reservationID, 'ready');
+      await db.updateReservationStatus(nextReservation.reservationID, 'ready', holdExpiry.toISOString());
       Notification.sendReservationReady(
         nextReservation.memberEmail, nextReservation.memberName,
         nextReservation.bookTitle, holdExpiry.toDateString()
-      ).catch(() => {});
+      ).catch(e => console.error('[ReservationReady] Email failed:', e.message));
     }
 
     res.json({ message: 'Return accepted. Book checked in successfully.' });
@@ -451,6 +484,15 @@ app.post('/api/return-requests/:id/mark-paid', authenticate, authorize('libraria
     if (!request) return err(res, 404, 'Return request not found.');
     if (request.fine_paid) return err(res, 400, 'Fine already marked as paid.');
     if (!request.fine_amount) return err(res, 400, 'No fine on this request.');
+
+    const txRow = await db.getTransactionByID(request.transaction_id);
+
+    // Insert fine record as paid immediately so it shows in the Fines tab
+    const fine = Fine.fromTransaction(txRow.memberID, txRow.transactionID, txRow.dueDate);
+    if (fine) {
+      await db.insertFine({ ...fine.toJSON(), isPaid: true });
+      // Don't add to outstanding fines since it's already paid
+    }
 
     await db.updateReturnRequest(request.request_id, { fine_paid: 1, payment_method: 'counter' });
 

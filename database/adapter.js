@@ -97,6 +97,13 @@ async function getAllMembers() {
 }
 
 async function deleteMember(memberID) {
+  await run(`DELETE FROM return_requests WHERE member_id = ?`, [memberID]);
+  await run(`DELETE FROM borrow_requests WHERE member_id = ?`, [memberID]);
+  await run(`DELETE FROM reservations WHERE member_id = ?`, [memberID]);
+  await run(`DELETE FROM fines WHERE member_id = ?`, [memberID]);
+  await run(`DELETE FROM payments WHERE member_id = ?`, [memberID]);
+  await run(`DELETE FROM notifications WHERE member_id = ?`, [memberID]);
+  await run(`DELETE FROM borrow_transactions WHERE member_id = ?`, [memberID]);
   return run(`DELETE FROM users WHERE user_id = ? AND role = 'member'`, [memberID]);
 }
 
@@ -247,9 +254,9 @@ async function getMemberHistory(memberID) {
 async function insertFine(data) {
   const { lastID } = await run(
     `INSERT INTO fines (member_id, transaction_id, amount, days_overdue, is_paid, created_at)
-     VALUES (?, ?, ?, ?, 0, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?)`,
     [data.memberID, data.transactionID, data.amount, data.daysOverdue,
-     new Date().toISOString()]
+     data.isPaid ? 1 : 0, new Date().toISOString()]
   );
   return { fineID: lastID };
 }
@@ -322,7 +329,13 @@ async function insertReservation(record) {
   return { reservationID: lastID };
 }
 
-async function updateReservationStatus(reservationID, status) {
+async function updateReservationStatus(reservationID, status, expiryDate = null) {
+  if (status === 'ready' && expiryDate) {
+    return run(
+      `UPDATE reservations SET status = ?, expiry_date = ? WHERE reservation_id = ?`,
+      [status, expiryDate, reservationID]
+    );
+  }
   return run(`UPDATE reservations SET status = ? WHERE reservation_id = ?`, [status, reservationID]);
 }
 
@@ -446,6 +459,15 @@ async function updateBorrowRequest(requestID, status) {
   return run(`UPDATE borrow_requests SET status = ? WHERE request_id = ?`, [status, requestID]);
 }
 
+async function countActiveReservationsForBook(bookID) {
+  const row = await get(
+    `SELECT COUNT(*) AS total FROM reservations
+     WHERE book_id = ? AND status IN ('pending', 'ready')`,
+    [bookID]
+  );
+  return row ? row.total : 0;
+}
+
 async function getNextReservationForBook(bookID) {
   return get(
     `SELECT r.reservation_id AS reservationID, r.member_id AS memberID,
@@ -521,5 +543,5 @@ module.exports = {
   logNotification, getAllNotifications,
   getDashboardStats, getRecentActivity,
   insertReturnRequest, getReturnRequests, getReturnRequestByID, updateReturnRequest,
-  insertBorrowRequest, getBorrowRequests, getBorrowRequestByID, updateBorrowRequest, getNextReservationForBook,
+  insertBorrowRequest, getBorrowRequests, getBorrowRequestByID, updateBorrowRequest, getNextReservationForBook, countActiveReservationsForBook,
 };
