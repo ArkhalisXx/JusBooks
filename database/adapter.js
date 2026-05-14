@@ -69,7 +69,7 @@ async function findUserByID(userID) {
 async function insertMember(username, email, hashedPassword) {
   const { lastID } = await run(
     `INSERT INTO users (username, email, password, role, membership_status, borrow_limit, outstanding_fines)
-     VALUES (?, ?, ?, 'member', 'active', 5, 0)`,
+     VALUES (?, ?, ?, 'member', 'pending', 5, 0)`,
     [username, email, hashedPassword]
   );
   return { userID: lastID };
@@ -143,8 +143,8 @@ async function insertBook(data) {
 
 async function updateBook(bookID, data) {
   return run(
-    `UPDATE books SET title=?, author=?, isbn=?, category=?, quantity=?, description=? WHERE book_id=?`,
-    [data.title, data.author, data.ISBN, data.category, data.quantity, data.description || '', bookID]
+    `UPDATE books SET title=?, author=?, isbn=?, category=?, quantity=?, available_qty=?, description=? WHERE book_id=?`,
+    [data.title, data.author, data.ISBN, data.category, data.quantity, data.availableQty ?? data.quantity, data.description || '', bookID]
   );
 }
 
@@ -408,6 +408,106 @@ async function getRecentActivity() {
   );
 }
 
+// ── BORROW REQUESTS ───────────────────────────────────────────────────────────
+
+async function insertBorrowRequest({ memberID, bookID, loanDays }) {
+  const { lastID } = await run(
+    `INSERT INTO borrow_requests (member_id, book_id, loan_days) VALUES (?, ?, ?)`,
+    [memberID, bookID, loanDays || 14]
+  );
+  return { requestID: lastID };
+}
+
+async function getBorrowRequests() {
+  return all(
+    `SELECT br.request_id AS requestID, br.member_id AS memberID,
+            br.book_id AS bookID, br.loan_days AS loanDays,
+            br.requested_at AS requestedAt, br.status,
+            u.username, u.email,
+            b.title AS bookTitle, b.available_qty AS availableQty
+     FROM borrow_requests br
+     JOIN users u ON u.user_id = br.member_id
+     JOIN books b ON b.book_id = br.book_id
+     ORDER BY br.requested_at ASC`
+  );
+}
+
+async function getBorrowRequestByID(requestID) {
+  return get(
+    `SELECT br.*, u.email, u.username, b.title AS bookTitle, b.available_qty AS availableQty
+     FROM borrow_requests br
+     JOIN users u ON u.user_id = br.member_id
+     JOIN books b ON b.book_id = br.book_id
+     WHERE br.request_id = ?`, [requestID]
+  );
+}
+
+async function updateBorrowRequest(requestID, status) {
+  return run(`UPDATE borrow_requests SET status = ? WHERE request_id = ?`, [status, requestID]);
+}
+
+async function getNextReservationForBook(bookID) {
+  return get(
+    `SELECT r.reservation_id AS reservationID, r.member_id AS memberID,
+            r.book_id AS bookID, r.reserved_at AS reservedAt,
+            r.expiry_date AS expiryDate, r.status,
+            u.email AS memberEmail, u.username AS memberName,
+            b.title AS bookTitle
+     FROM reservations r
+     JOIN users u ON u.user_id = r.member_id
+     JOIN books b ON b.book_id = r.book_id
+     WHERE r.book_id = ? AND r.status IN ('pending', 'ready')
+     ORDER BY r.reserved_at ASC
+     LIMIT 1`,
+    [bookID]
+  );
+}
+
+// ── RETURN REQUESTS ───────────────────────────────────────────────────────────
+
+async function insertReturnRequest({ transactionID, memberID, fineAmount, daysOverdue }) {
+  const result = await run(
+    `INSERT INTO return_requests (transaction_id, member_id, fine_amount, days_overdue, status)
+     VALUES (?, ?, ?, ?, 'pending')`,
+    [transactionID, memberID, fineAmount || 0, daysOverdue || 0]
+  );
+  return { requestID: result.lastID };
+}
+
+async function getReturnRequests() {
+  return all(
+    `SELECT rr.request_id AS requestID, rr.transaction_id AS transactionID,
+            rr.member_id AS memberID, rr.requested_at AS requestedAt,
+            rr.status, rr.fine_amount AS fineAmount, rr.days_overdue AS daysOverdue,
+            rr.fine_paid AS finePaid, rr.payment_method AS paymentMethod,
+            u.username, u.email,
+            b.title AS bookTitle
+     FROM return_requests rr
+     JOIN users u ON u.user_id = rr.member_id
+     JOIN borrow_transactions bt ON bt.transaction_id = rr.transaction_id
+     JOIN books b ON b.book_id = bt.book_id
+     ORDER BY rr.requested_at DESC`
+  );
+}
+
+async function getReturnRequestByID(requestID) {
+  return get(
+    `SELECT rr.*, bt.book_id AS bookID, bt.due_date AS dueDate,
+            u.email, u.username, b.title AS bookTitle
+     FROM return_requests rr
+     JOIN borrow_transactions bt ON bt.transaction_id = rr.transaction_id
+     JOIN users u ON u.user_id = rr.member_id
+     JOIN books b ON b.book_id = bt.book_id
+     WHERE rr.request_id = ?`, [requestID]
+  );
+}
+
+async function updateReturnRequest(requestID, data) {
+  const fields = Object.keys(data).map(k => `${k} = ?`).join(', ');
+  const values = [...Object.values(data), requestID];
+  return run(`UPDATE return_requests SET ${fields} WHERE request_id = ?`, values);
+}
+
 module.exports = {
   query,
   findUserByEmail, findUserByID,
@@ -420,4 +520,6 @@ module.exports = {
   insertReservation, updateReservationStatus, getReservationsByMember, getAllReservations,
   logNotification, getAllNotifications,
   getDashboardStats, getRecentActivity,
+  insertReturnRequest, getReturnRequests, getReturnRequestByID, updateReturnRequest,
+  insertBorrowRequest, getBorrowRequests, getBorrowRequestByID, updateBorrowRequest, getNextReservationForBook,
 };

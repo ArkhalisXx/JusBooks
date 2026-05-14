@@ -74,6 +74,19 @@ class Notification {
         <br><p>Welcome aboard!<br>— JusBooks Library</p>
       `,
     }),
+
+    activation_reminder: (data) => ({
+      subject: `📋 JusBooks — Action Required: Activate Your Membership`,
+      html   : `
+        <h2>Membership Activation Required</h2>
+        <p>Hi <strong>${data.memberName}</strong>,</p>
+        <p>You attempted to borrow a book, but your account has not been activated yet.</p>
+        <p>To activate your membership, please <strong>visit the library in person</strong>
+        to complete your registration and pay the membership fee.</p>
+        <p>Once a librarian activates your account, you will have full borrowing access.</p>
+        <br><p>See you soon!<br>— JusBooks Library</p>
+      `,
+    }),
   };
 
   // ── Constructor ───────────────────────────────────────────────────────────────
@@ -168,6 +181,11 @@ class Notification {
 
   static async sendMembershipActivated(recipientEmail, recipientName) {
     const n = new Notification(null, "membership_activated", recipientEmail, recipientName, {});
+    return n.send();
+  }
+
+  static async sendActivationReminder(recipientEmail, recipientName) {
+    const n = new Notification(null, "activation_reminder", recipientEmail, recipientName, {});
     return n.send();
   }
 

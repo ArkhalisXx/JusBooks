@@ -15,6 +15,7 @@ const Member       = require('./models/Member');
 const Librarian    = require('./models/Librarian');
 const Book         = require('./models/Book');
 const BorrowTransaction = require('./models/BorrowTransaction');
+const Fine         = require('./models/Fine');
 const Reservation  = require('./models/Reservation');
 const Report       = require('./models/Report');
 const Notification = require('./models/Notification');
@@ -191,64 +192,186 @@ app.delete('/api/members/:id', authenticate, authorize('librarian'), async (req,
 // BORROW / RETURN ROUTES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// POST /api/borrow — member only
+// POST /api/borrow — member submits a borrow request
 app.post('/api/borrow', authenticate, authorize('member'), async (req, res) => {
   try {
-    const { bookID } = req.body;
+    const { bookID, loanDays } = req.body;
     if (!bookID) return err(res, 400, 'bookID required.');
 
-    // Load member and book from DB
     const memberRow = await db.findUserByID(req.user.userID);
     if (!memberRow) return err(res, 404, 'Member not found.');
 
+    if (memberRow.membershipStatus === 'pending') {
+      Notification.sendActivationReminder(memberRow.email, memberRow.username).catch(() => {});
+      return err(res, 403, 'Your account has not been activated yet. Please visit the library to activate your membership.');
+    }
+    if (memberRow.membershipStatus !== 'active') {
+      return err(res, 403, `Your account is ${memberRow.membershipStatus}.`);
+    }
+
     const bookRow = await db.getBookByID(bookID);
     if (!bookRow) return err(res, 404, 'Book not found.');
-
-    const member  = new Member(
-      memberRow.userID, memberRow.username, memberRow.email, '',
-      memberRow.membershipStatus, memberRow.borrowLimit, memberRow.outstandingFines
-    );
+    if (bookRow.availableQty <= 0) {
+      return err(res, 400, 'Book is currently unavailable. Please reserve it instead.');
+    }
 
     const borrowCount = await db.getBorrowCountByMember(req.user.userID);
-    const record      = member.borrowBook(bookRow, borrowCount);
+    if (borrowCount >= memberRow.borrowLimit) {
+      return err(res, 400, `Borrow limit of ${memberRow.borrowLimit} books reached.`);
+    }
+    if (memberRow.outstandingFines > 0) {
+      return err(res, 400, `Outstanding fines of ₱${memberRow.outstandingFines.toFixed(2)} must be paid first.`);
+    }
 
-    // Persist via BorrowTransaction
-    const tx = new BorrowTransaction(null, record.memberID, record.bookID, record.issueDate, record.dueDate);
-    await tx.recordBorrow(db);
+    const existing = (await db.getBorrowRequests()).find(
+      r => r.memberID === req.user.userID && r.bookID === bookID && r.status === 'pending'
+    );
+    if (existing) return err(res, 409, 'You already have a pending borrow request for this book.');
 
-    // Send email notification (non-blocking)
-    Notification.sendDueReminder(
-      memberRow.email, memberRow.username, bookRow.title,
-      tx.dueDate.toDateString()
-    ).catch(() => {});
+    // Block if someone else has a ready reservation for this book
+    const nextReservation = await db.getNextReservationForBook(bookID);
+    if (nextReservation && nextReservation.memberID !== req.user.userID) {
+      return err(res, 403, `This book is currently on hold for another member who has a reservation. Please reserve it to join the queue.`);
+    }
 
-    res.status(201).json(tx.toJSON());
+    const { requestID } = await db.insertBorrowRequest({
+      memberID: req.user.userID, bookID, loanDays: loanDays || 14
+    });
+
+    res.status(201).json({
+      message: 'Borrow request submitted. Please visit the library to pick up the book.',
+      requestID,
+    });
   } catch (e) {
     err(res, 400, e.message);
   }
 });
 
-// POST /api/return/:transactionID — member or librarian
-app.post('/api/return/:transactionID', authenticate, async (req, res) => {
+// GET /api/borrow-requests — librarian: view all borrow requests
+app.get('/api/borrow-requests', authenticate, authorize('librarian'), async (req, res) => {
+  try {
+    res.json(await db.getBorrowRequests());
+  } catch (e) {
+    err(res, 500, e.message);
+  }
+});
+
+// POST /api/borrow-requests/:id/accept — librarian hands book to member
+app.post('/api/borrow-requests/:id/accept', authenticate, authorize('librarian'), async (req, res) => {
+  try {
+    const request = await db.getBorrowRequestByID(req.params.id);
+    if (!request) return err(res, 404, 'Borrow request not found.');
+    if (request.status !== 'pending') return err(res, 400, 'Request is no longer pending.');
+
+    const bookRow = await db.getBookByID(request.book_id);
+    if (!bookRow || bookRow.availableQty <= 0) {
+      return err(res, 400, 'Book is not available in stock.');
+    }
+
+    // Block if someone else has a ready reservation for this book
+    const nextReservation = await db.getNextReservationForBook(request.book_id);
+    if (nextReservation && nextReservation.memberID !== request.member_id) {
+      return err(res, 403, `Cannot accept — "${nextReservation.memberName}" has a reservation on hold for this book. Accept their request first or wait for their hold to expire.`);
+    }
+
+    const memberRow = await db.findUserByID(request.member_id);
+    const member = new Member(
+      memberRow.userID, memberRow.username, memberRow.email, '',
+      memberRow.membershipStatus, memberRow.borrowLimit, memberRow.outstandingFines
+    );
+
+    const borrowCount = await db.getBorrowCountByMember(request.member_id);
+    const record = member.borrowBook(bookRow, borrowCount, request.loan_days);
+
+    const tx = new BorrowTransaction(null, record.memberID, record.bookID, record.issueDate, record.dueDate);
+    await tx.recordBorrow(db);
+
+    await db.updateBorrowRequest(request.request_id, 'accepted');
+
+    Notification.sendDueReminder(
+      memberRow.email, memberRow.username, request.bookTitle, tx.dueDate.toDateString()
+    ).catch(() => {});
+
+    res.json({ message: `Borrow accepted. Due: ${tx.dueDate.toDateString()}` });
+  } catch (e) {
+    err(res, 400, e.message);
+  }
+});
+
+// POST /api/borrow-requests/:id/reject — librarian rejects a borrow request
+app.post('/api/borrow-requests/:id/reject', authenticate, authorize('librarian'), async (req, res) => {
+  try {
+    const request = await db.getBorrowRequestByID(req.params.id);
+    if (!request) return err(res, 404, 'Borrow request not found.');
+    if (request.status !== 'pending') return err(res, 400, 'Request is no longer pending.');
+
+    await db.updateBorrowRequest(request.request_id, 'rejected');
+    res.json({ message: 'Borrow request rejected.' });
+  } catch (e) {
+    err(res, 400, e.message);
+  }
+});
+
+// POST /api/return/:transactionID — member submits a return request
+app.post('/api/return/:transactionID', authenticate, authorize('member'), async (req, res) => {
   try {
     const txRow = await db.getTransactionByID(req.params.transactionID);
     if (!txRow) return err(res, 404, 'Transaction not found.');
+    if (txRow.memberID !== req.user.userID) return err(res, 403, 'You can only return your own books.');
+    if (txRow.status === 'returned') return err(res, 400, 'This book has already been returned.');
 
-    // Members can only return their own books
-    if (req.user.role === 'member' && txRow.memberID !== req.user.userID)
-      return err(res, 403, 'You can only return your own books.');
+    // Check if a pending request already exists
+    const existing = (await db.getReturnRequests()).find(
+      r => r.transactionID === txRow.transactionID && r.status === 'pending'
+    );
+    if (existing) return err(res, 409, 'A return request for this book is already pending.');
 
-    const tx   = new BorrowTransaction(
+    // Calculate overdue fine if applicable
+    const tx = new BorrowTransaction(
+      txRow.transactionID, txRow.memberID, txRow.bookID,
+      txRow.issueDate, txRow.dueDate, txRow.returnDate, txRow.status
+    );
+    const { daysOverdue, projectedFine } = tx.checkOverdueStatus();
+
+    const { requestID } = await db.insertReturnRequest({
+      transactionID: txRow.transactionID,
+      memberID     : req.user.userID,
+      fineAmount   : projectedFine,
+      daysOverdue,
+    });
+
+    res.json({
+      message    : 'Return request submitted. Please bring the book to the library.',
+      requestID,
+      fineAmount : projectedFine,
+      daysOverdue,
+      isOverdue  : daysOverdue > 0,
+    });
+  } catch (e) {
+    err(res, 400, e.message);
+  }
+});
+
+// POST /api/admin/return/:transactionID — librarian directly marks a book returned
+app.post('/api/admin/return/:transactionID', authenticate, authorize('librarian'), async (req, res) => {
+  try {
+    const txRow = await db.getTransactionByID(req.params.transactionID);
+    if (!txRow) return err(res, 404, 'Transaction not found.');
+    if (txRow.status === 'returned') return err(res, 400, 'Already returned.');
+
+    const tx = new BorrowTransaction(
       txRow.transactionID, txRow.memberID, txRow.bookID,
       txRow.issueDate, txRow.dueDate, txRow.returnDate, txRow.status
     );
     const fine = await tx.recordReturn(db);
 
-    // If overdue, send email
     if (fine) {
+      const { fineID } = await db.insertFine(fine.toJSON());
+      fine.fineID = fineID;
+      await db.updateMemberFines(txRow.memberID, fine.amount);
       const memberRow = await db.findUserByID(txRow.memberID);
+      const bookRow   = await db.getBookByID(txRow.bookID);
       if (memberRow) {
-        const bookRow = await db.getBookByID(txRow.bookID);
         Notification.sendOverdueNotice(
           memberRow.email, memberRow.username,
           bookRow?.title || 'your book', fine.daysOverdue, fine.amount
@@ -256,7 +379,82 @@ app.post('/api/return/:transactionID', authenticate, async (req, res) => {
       }
     }
 
-    res.json({ message: fine ? `Returned late. Fine: ₱${fine.amount}` : 'Returned on time.', fine });
+    res.json({ message: fine ? `Returned late. Fine of ₱${fine.amount} added.` : 'Returned on time.', fine });
+  } catch (e) {
+    err(res, 400, e.message);
+  }
+});
+
+// GET /api/return-requests — librarian: view all return requests
+app.get('/api/return-requests', authenticate, authorize('librarian'), async (req, res) => {
+  try {
+    res.json(await db.getReturnRequests());
+  } catch (e) {
+    err(res, 500, e.message);
+  }
+});
+
+// POST /api/return-requests/:id/accept — librarian physically receives book and confirms return
+app.post('/api/return-requests/:id/accept', authenticate, authorize('librarian'), async (req, res) => {
+  try {
+    const request = await db.getReturnRequestByID(req.params.id);
+    if (!request) return err(res, 404, 'Return request not found.');
+    if (request.status === 'returned') return err(res, 400, 'Already accepted.');
+
+    // Block if fine is unpaid
+    if (request.fine_amount > 0 && !request.fine_paid) {
+      return err(res, 400, `Fine of ₱${request.fine_amount} must be settled before accepting return.`);
+    }
+
+    const txRow = await db.getTransactionByID(request.transaction_id);
+    const tx = new BorrowTransaction(
+      txRow.transactionID, txRow.memberID, txRow.bookID,
+      txRow.issueDate, txRow.dueDate, txRow.returnDate, txRow.status
+    );
+
+    // Actual return — closes transaction, increments stock
+    await tx.recordReturn(db);
+
+    // If overdue and fine was paid at counter, log the fine as paid
+    if (request.fine_amount > 0 && request.fine_paid) {
+      const fine = Fine.fromTransaction(txRow.memberID, txRow.transactionID, txRow.dueDate);
+      if (fine) {
+        const { fineID } = await db.insertFine({ ...fine.toJSON(), is_paid: 1 });
+        await db.updateMemberFines(txRow.memberID, 0); // already settled
+      }
+    }
+
+    await db.updateReturnRequest(request.request_id, { status: 'returned' });
+
+    // Check reservation queue for this book — notify next in line
+    const nextReservation = await db.getNextReservationForBook(txRow.bookID);
+    if (nextReservation) {
+      const holdExpiry = new Date();
+      holdExpiry.setDate(holdExpiry.getDate() + 3);
+      await db.updateReservationStatus(nextReservation.reservationID, 'ready');
+      Notification.sendReservationReady(
+        nextReservation.memberEmail, nextReservation.memberName,
+        nextReservation.bookTitle, holdExpiry.toDateString()
+      ).catch(() => {});
+    }
+
+    res.json({ message: 'Return accepted. Book checked in successfully.' });
+  } catch (e) {
+    err(res, 400, e.message);
+  }
+});
+
+// POST /api/return-requests/:id/mark-paid — librarian marks fine paid at counter
+app.post('/api/return-requests/:id/mark-paid', authenticate, authorize('librarian'), async (req, res) => {
+  try {
+    const request = await db.getReturnRequestByID(req.params.id);
+    if (!request) return err(res, 404, 'Return request not found.');
+    if (request.fine_paid) return err(res, 400, 'Fine already marked as paid.');
+    if (!request.fine_amount) return err(res, 400, 'No fine on this request.');
+
+    await db.updateReturnRequest(request.request_id, { fine_paid: 1, payment_method: 'counter' });
+
+    res.json({ message: `Fine of ₱${request.fine_amount} marked as paid at counter.` });
   } catch (e) {
     err(res, 400, e.message);
   }
